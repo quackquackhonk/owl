@@ -17,3 +17,17 @@ library:
   build-tools:
   - alex
   - happy
+
+tests:
+  owl-parser-tests:
+    main:                ParserTests.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - base
+    - HUnit
+    - bytestring
+    - owl

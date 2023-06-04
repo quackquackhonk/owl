@@ -67,6 +67,10 @@ tokens :-
 <0> "{"     { tok LBrace }
 <0> "}"     { tok RBrace }
 <0> ";"     { tok SemiColon }
+<0> "$"     { tok Dollar }
+
+<0> "@"      { tok At }
+<0> "=>"     { tok ThickArrow }
 
 <0> typ     { tok Type }
 <0> is      { tok Is }
@@ -134,13 +138,16 @@ data Token
   | And
   | Or
   | Not
-  -- Parenthesis
+  -- Punctuation
   | LParen
   | RParen
-  -- Sequences
   | LBrace
   | RBrace
   | SemiColon
+  | Dollar
+  -- Anon Funcs
+  | At
+  | ThickArrow
   -- Types
   | Type
   | Is

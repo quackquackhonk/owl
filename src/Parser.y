@@ -1,12 +1,11 @@
 {
 module Parser
   ( parseOwl,
-    printAst
+    astFromStr
   )
 where
 
 import Data.ByteString.Lazy.Char8 (ByteString)
-import Text.Pretty.Simple (pPrint)
 
 import Ast
 import qualified Lexer as L
@@ -51,19 +50,25 @@ import qualified Lexer as L
   -- Parenthesis
   '('        { L.RangedToken L.LParen _ }
   ')'        { L.RangedToken L.RParen _ }
-  -- Lists
   '{'        { L.RangedToken L.LBrace _ }
   '}'        { L.RangedToken L.RBrace _ }
   ';'        { L.RangedToken L.SemiColon _ }
+  '$'        { L.RangedToken L.Dollar _ }
+  -- Anon Functions
+  '@' { L.RangedToken L.At _ }
+  '=>' { L.RangedToken L.ThickArrow _ }
   -- Types
   typ        { L.RangedToken L.Type _ }
   is         { L.RangedToken L.Is _ }
   '->'       { L.RangedToken L.Arrow _ }
+  eof        { L.RangedToken L.EOF _ }   
 
 -- type arrows are right associative
+%right '=>'
 %right else
 %right '->'
 
+%right '$'
 %left '|'
 %left '&'
 %nonassoc '=' '!=' '<' '>' '<=' '>=' '!'
@@ -80,76 +85,76 @@ many(p)
 : many_rev(p) { reverse $1 }
 
 sepBy_rev(p, sep)
-:                         { [] }
+: p                       { [$1] }
 | sepBy_rev(p, sep) sep p { $3 : $1 }
 
 sepBy(p, sep)
 : sepBy_rev(p, sep) { reverse $1 }
 
-optional(p)
-:          { Nothing }
-| p        { Some $1 }
-
-program :: { Program L.Range }
+program :: { Program }
 : decls expr { Program $1 $2 }
 
-name :: { Name L.Range }
-: ident { unTok $1 (\rr (L.Identifier name) -> Name rr name)}
+name :: { Name }
+: ident { unTok $1 (\rr (L.Identifier name) -> Name name)}
 
-decls :: { [Declaration L.Range] }
-: many(decl) { $1 }
+decls :: { [Declaration] }
+: many(semi_decl) { $1 }
 
-decl :: { Declaration L.Range }
-: let name many(name) be expr ';' { DValue (L.rtRange $1 <-> L.rtRange $6) $2 $3 $5 }
-| typ name is type                { DType (L.rtRange $1 <-> info $4) $2 $4 }
+semi_decl :: { Declaration }
+: decl ';'        { $1 }
 
-expr :: { Expression L.Range }
+decl :: { Declaration }
+: let name many(name) be expr { DValue $2 $3 $5 }
+| typ name is type   { DType  $2 $4 }
+
+expr :: { Expression }
 : exprapp    { $1 }
 | exprcond   { $1 }
-| exprseq    { $1 }
-| '-' expr   { EUnaryOp (L.rtRange $1 <-> info $2) (Neg $ L.rtRange $1) $2 }
-| '!' expr   { EUnaryOp (L.rtRange $1 <-> info $2) (Not $ L.rtRange $1) $2 }
+| '-' expr   { EUnaryOp UONeg $2 }
+| '!' expr   { EUnaryOp UONot $2 }
+-- anon functions
+| '@' many(name) '=>' expr { EFunc $2 $4 }
+-- apply
+| expr '$' expr { ECall $1 $3 }
 -- arithmetic
-| expr '+' expr { EBinaryOp (info $1 <-> info $3) (BOAdd (L.rtRange $2)) $1 $3 }
-| expr '-' expr { EBinaryOp (info $1 <-> info $3) (BOSub (L.rtRange $2)) $1 $3 }
-| expr '*' expr { EBinaryOp (info $1 <-> info $3) (BOMul (L.rtRange $2)) $1 $3 }
-| expr '/' expr { EBinaryOp (info $1 <-> info $3) (BODiv (L.rtRange $2)) $1 $3 }
+| expr '+' expr { EBinaryOp  (BOAdd ) $1 $3 }
+| expr '-' expr { EBinaryOp  (BOSub ) $1 $3 }
+| expr '*' expr { EBinaryOp  (BOMul ) $1 $3 }
+| expr '/' expr { EBinaryOp  (BODiv ) $1 $3 }
 -- comparison
-| expr '=' expr  { EBinaryOp (info $1 <-> info $3) (BOEq  (L.rtRange $2)) $1 $3 }
-| expr '!=' expr { EBinaryOp (info $1 <-> info $3) (BONeq (L.rtRange $2)) $1 $3 }
-| expr '<' expr  { EBinaryOp (info $1 <-> info $3) (BOLt  (L.rtRange $2)) $1 $3 }
-| expr '>' expr  { EBinaryOp (info $1 <-> info $3) (BOGt  (L.rtRange $2)) $1 $3 }
-| expr '<=' expr { EBinaryOp (info $1 <-> info $3) (BOLtEq (L.rtRange $2)) $1 $3 }
-| expr '>=' expr { EBinaryOp (info $1 <-> info $3) (BOGtEq (L.rtRange $2)) $1 $3 }
+| expr '=' expr  { EBinaryOp  (BOEq  ) $1 $3 }
+| expr '!=' expr { EBinaryOp  (BONeq ) $1 $3 }
+| expr '<' expr  { EBinaryOp  (BOLt  ) $1 $3 }
+| expr '>' expr  { EBinaryOp  (BOGt  ) $1 $3 }
+| expr '<=' expr { EBinaryOp  (BOLtEq ) $1 $3 }
+| expr '>=' expr { EBinaryOp  (BOGtEq ) $1 $3 }
 -- logic
-| expr '&' expr { EBinaryOp (info $1 <-> info $3) (BOAnd (L.rtRange $2)) $1 $3 }
-| expr '|' expr { EBinaryOp (info $1 <-> info $3) (BOOr  (L.rtRange $2)) $1 $3 }
+| expr '&' expr { EBinaryOp  (BOAnd ) $1 $3 }
+| expr '|' expr { EBinaryOp  (BOOr  ) $1 $3 }
 
-exprapp :: { Expression L.Range }
-: exprapp atom { ECall (info $1 <-> info $2) $1 $2 }
+exprapp :: { Expression }
+: exprapp atom { ECall $1 $2 }
 | atom      { $1 }
 
-exprcond :: {Expression L.Range}
-: if expr then expr else expr { ECond (L.rtRange $1 <-> info $6) $2 $4 $6 }
+exprcond :: { Expression }
+: if expr then expr else expr { ECond  $2 $4 $6 }
 
-exprseq :: { Expression L.Range }
-: '{' sepBy(stmt, ';') '}' { ESeq (L.rtRange $1 <-> L.rtRange $3) $2 }
+atom :: { Expression }
+: '('')'                           { EUnit }
+| '{' sepBy(stmt, ';') '}'         { ESeq $2 }
+| '(' expr ')'                     { EParen  $2 }
+| name                             { EVar $1 }
+| boolean                          { unTok $1 (\rr (L.Boolean bb) -> EBool bb)}
+| integer                          { unTok $1 (\rr (L.Integer int) -> EInt int)}
 
-stmt :: { Statement L.Range }
-: decl  { Decl (info $1) $1 }
-| expr  { Expr (info $1) $1 }
+stmt :: { Statement }
+: expr  { Expr  $1 }
+| decl  { Decl  $1 }
 
-atom :: { Expression L.Range }
-: '(' expr ')'                     { EParen (L.rtRange $1 <-> L.rtRange $3) $2 }
-| '('')'                           { EUnit $ L.rtRange $1 <-> L.rtRange $2 }
-| name                             { EVar (info $1) $1 }
-| boolean                          { unTok $1 (\rr (L.Boolean bb) -> EBool rr bb)}
-| integer                          { unTok $1 (\rr (L.Integer int) -> EInt rr int)}
-
-type ::   { Type L.Range }
-: name           { TVar (info $1) $1 }
-| '(' type ')'   { TParen (L.rtRange $1 <-> L.rtRange $3) $2 }
-| type '->' type { TArrow (info $1 <-> info $3) $1 $3 }
+type ::   { Type }
+: name           { parseTVar $1 }
+| '(' type ')'   { TParen $2 }
+| type '->' type { TArrow $1 $3 }
 
 {
 parseError :: L.RangedToken -> L.Alex a
@@ -157,11 +162,18 @@ parseError _ = do
   (L.AlexPn _ line column, _, _, _) <- L.alexGetInput
   L.alexError $ "Parse error at line " <> show line <> ", column " <> show column
 
-printAst :: ByteString -> IO ()
-printAst str = case L.runAlex str parseOwl of
-    Left e -> print $ show e
-    Right ast -> pPrint ast
-    
+parseTVar tt =
+    case tt of
+      Name "Unit" -> TUnit
+      Name "Int"  -> TInt
+      Name "Bool" -> TBool
+      Name xx -> TVar (Name xx)
+
+-- astFromStr :: ByteString -> Either (L.ParseError) (Program L.Range) 
+astFromStr str = case L.runAlex str parseOwl of
+    Left e -> error $ show e
+    Right ast -> ast
+
 
 lexer :: (L.RangedToken -> L.Alex a) -> L.Alex a
 lexer = (=<< L.alexMonadScan)

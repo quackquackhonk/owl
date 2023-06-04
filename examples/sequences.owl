@@ -1,0 +1,10 @@
+let complex w x y z be {
+  let a be w - x;
+  let b be y / z;
+  let c be a * b;
+  ();
+  true;
+  c
+};
+
+()

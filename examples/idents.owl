@@ -1,7 +1,0 @@
-let identifier = 10
-let something? = true
-let identifier' = identifier
-let a_long_word = 12345678900
-let __dunder__ = arstars
-
-a_long_word

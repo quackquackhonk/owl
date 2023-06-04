@@ -2,13 +2,30 @@
 
 module Ast
   ( Program (..),
-    Name(..),
+    makeProgram,
+    Name (..),
     Declaration (..),
     Type (..),
     Expression (..),
-    Statement(..),
-    BinOperator(..),
-    UnOperator(..),
+    Statement (..),
+    BinOperator (..),
+    UnOperator (..),
+    mkEVar,
+    mkTVar,
+    mkEMul,
+    mkEAdd,
+    mkESub,
+    mkEDiv,
+    mkEEq,
+    mkENeq,
+    mkELt,
+    mkELtEq,
+    mkEGt,
+    mkEGtEq,
+    mkEAnd,
+    mkEOr,
+    mkFuncType,
+    repeatFuncType,
     unTok,
     info,
     (<->),
@@ -18,66 +35,113 @@ where
 import Data.ByteString.Lazy.Char8 (ByteString)
 import Data.Maybe (fromJust)
 import Data.Monoid (First (..))
-import Text.Pretty.Simple (pPrint)
 import qualified Lexer as L
+import Text.Pretty.Simple (pPrint)
 
 -- Each constructor uses a polynomial type variable to store metadata along with the AST
 
-data Program a = Program [Declaration a] (Expression a)
-  deriving (Foldable, Show)
+data Program = Program [Declaration] (Expression)
+  deriving (Show, Eq)
 
-data Name a = Name a ByteString
-  deriving (Foldable, Show)
+makeProgram :: [Declaration] -> Expression -> Program
+makeProgram decls exprs = Program decls exprs
 
-data Declaration a
-  = DValue a (Name a) [Name a] (Expression a)
-  | DType a (Name a) (Type a)
-  deriving (Foldable, Show)
+data Name = Name ByteString
+  deriving (Show, Eq)
 
-data Type a
-  = TVar a (Name a)
-  | TParen a (Type a)
-  | TArrow a (Type a) (Type a)
-  deriving (Foldable, Show)
+data Declaration
+  = DValue Name [Name] Expression
+  | DType Name Type
+  deriving (Show, Eq)
 
-data Expression a
-  = EUnit a
-  | EInt a Integer
-  | EBool a Bool
-  | EVar a (Name a)
-  | EParen a (Expression a)
-  | EBinaryOp a (BinOperator a) (Expression a) (Expression a)
-  | EUnaryOp a (UnOperator a) (Expression a)
-  | ECond a (Expression a) (Expression a) (Expression a) 
-  | ECall a (Expression a) (Expression a)
-  | ESeq a [Statement a]
-  deriving (Foldable, Show)
+data Type
+  = TVar Name
+  | TUnit
+  | TInt
+  | TBool
+  | TParen Type
+  | TArrow Type Type
+  deriving (Show, Eq)
 
-data Statement a
-  = Expr a (Expression a)
-  | Decl a (Declaration a)
-  deriving (Foldable, Show)
+data Expression
+  = EUnit
+  | EInt Integer
+  | EBool Bool
+  | EVar Name
+  | EParen Expression
+  | EBinaryOp BinOperator Expression Expression
+  | EUnaryOp UnOperator Expression
+  | ECond Expression Expression Expression
+  | EFunc [Name] Expression
+  | ECall Expression Expression
+  | ESeq [Statement]
+  deriving (Show, Eq)
 
-data BinOperator a
-  = BOAdd a
-  | BOSub a 
-  | BOMul a
-  | BODiv a
-  | BOEq a
-  | BONeq a
-  | BOLt a
-  | BOLtEq a
-  | BOGt a
-  | BOGtEq a
-  | BOAnd a
-  | BOOr a
-  deriving (Foldable, Show)
+data Statement
+  = Expr Expression
+  | Decl Declaration
+  deriving (Show, Eq)
 
-data UnOperator a
-  = Neg a
-  | Not a
-  deriving (Foldable, Show)
+data BinOperator
+  = BOAdd
+  | BOSub
+  | BOMul
+  | BODiv
+  | BOEq
+  | BONeq
+  | BOLt
+  | BOLtEq
+  | BOGt
+  | BOGtEq
+  | BOAnd
+  | BOOr
+  deriving (Show, Eq)
 
+data UnOperator
+  = UONeg
+  | UONot
+  deriving (Show, Eq)
+
+-- Convenience Functions for making ASTs
+
+mkEVar nn = EVar . Name $ nn
+
+mkTVar nn = TVar . Name $ nn
+
+mkBinOp op ll rr = EBinaryOp op ll rr
+
+mkEMul = mkBinOp BOMul
+
+mkEAdd = mkBinOp BOAdd
+
+mkESub = mkBinOp BOSub
+
+mkEDiv = mkBinOp BODiv
+
+mkEEq = mkBinOp BOEq
+
+mkENeq = mkBinOp BONeq
+
+mkELt = mkBinOp BOLt
+
+mkELtEq = mkBinOp BOLtEq
+
+mkEGt = mkBinOp BOGt
+
+mkEGtEq = mkBinOp BOGtEq
+
+mkEAnd = mkBinOp BOAnd
+
+mkEOr = mkBinOp BOOr
+
+
+mkFuncType :: [Type] -> Type
+mkFuncType [] = TVar $ Name "Unit"
+mkFuncType [t] = t
+mkFuncType (t : ts) = foldr TArrow t ts
+
+repeatFuncType :: Int -> Type -> Type
+repeatFuncType nn tt = mkFuncType $ take nn $ repeat tt
 
 -- | Build a simple node by extracting its token type and range.
 unTok :: L.RangedToken -> (L.Range -> L.Token -> a) -> a
