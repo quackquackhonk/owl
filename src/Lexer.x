@@ -40,6 +40,7 @@ tokens :-
 <0> "#" .*;
 
 <0> let     { tok Let }
+<0> be      { tok Be }
 <0> if      { tok If }
 <0> then    { tok Then }
 <0> else    { tok Else }
@@ -49,16 +50,16 @@ tokens :-
 <0> "*"     { tok Times }
 <0> "/"     { tok Divide }
 
-<0> "="    { tok Eq }
-<0> "!="    { tok Neq }
+<0> "="     { tok Eq }
+<0> "!="      { tok Neq }
 <0> "<"     { tok Lt }
 <0> ">"     { tok Gt }
 <0> "<="    { tok Lteq }
 <0> ">="    { tok Gteq }
 
-<0> and     { tok And }
-<0> or      { tok Or }
-<0> not     { tok Not }
+<0> "&"     { tok And }
+<0> "|"      { tok Or }
+<0> "!"     { tok Not }
 
 <0> "("     { tok LParen }
 <0> ")"     { tok RParen }
@@ -66,7 +67,6 @@ tokens :-
 <0> "{"     { tok LBrace }
 <0> "}"     { tok RBrace }
 <0> ";"     { tok SemiColon }
-<0> ","     { tok Comma }
 
 <0> typ     { tok Type }
 <0> is      { tok Is }
@@ -114,6 +114,7 @@ data Token
   | Boolean Bool
   -- Keywords
   | Let
+  | Be
   | If
   | Then
   | Else
@@ -136,10 +137,9 @@ data Token
   -- Parenthesis
   | LParen
   | RParen
-  -- Lists
+  -- Sequences
   | LBrace
   | RBrace
-  | Comma
   | SemiColon
   -- Types
   | Type

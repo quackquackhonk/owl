@@ -4,8 +4,11 @@ module Ast
   ( Program (..),
     Name(..),
     Declaration (..),
-    Expression (..),
     Type (..),
+    Expression (..),
+    Statement(..),
+    BinOperator(..),
+    UnOperator(..),
     unTok,
     info,
     (<->),
@@ -27,24 +30,54 @@ data Name a = Name a ByteString
   deriving (Foldable, Show)
 
 data Declaration a
-  = ValueDecl a (Name a) [Name a] (Expression a)
-  | TypeDecl a (Name a) (Type a)
-  deriving (Foldable, Show)
-
-data Expression a
-  = Unit a
-  | IntLiteral a Integer
-  | BoolLiteral a Bool
-  | Var a (Name a)
-  | Conditional a (Expression a) (Expression a) (Expression a)
-  | FunCall a (Expression a) [Expression a]
-  | Sequence a [Expression a]
+  = DValue a (Name a) [Name a] (Expression a)
+  | DType a (Name a) (Type a)
   deriving (Foldable, Show)
 
 data Type a
-  = VarTy a (Name a)
-  | FuncTy a [Type a] (Type a)
+  = TVar a (Name a)
+  | TParen a (Type a)
+  | TArrow a (Type a) (Type a)
   deriving (Foldable, Show)
+
+data Expression a
+  = EUnit a
+  | EInt a Integer
+  | EBool a Bool
+  | EVar a (Name a)
+  | EParen a (Expression a)
+  | EBinaryOp a (BinOperator a) (Expression a) (Expression a)
+  | EUnaryOp a (UnOperator a) (Expression a)
+  | ECond a (Expression a) (Expression a) (Expression a) 
+  | ECall a (Expression a) (Expression a)
+  | ESeq a [Statement a]
+  deriving (Foldable, Show)
+
+data Statement a
+  = Expr a (Expression a)
+  | Decl a (Declaration a)
+  deriving (Foldable, Show)
+
+data BinOperator a
+  = BOAdd a
+  | BOSub a 
+  | BOMul a
+  | BODiv a
+  | BOEq a
+  | BONeq a
+  | BOLt a
+  | BOLtEq a
+  | BOGt a
+  | BOGtEq a
+  | BOAnd a
+  | BOOr a
+  deriving (Foldable, Show)
+
+data UnOperator a
+  = Neg a
+  | Not a
+  deriving (Foldable, Show)
+
 
 -- | Build a simple node by extracting its token type and range.
 unTok :: L.RangedToken -> (L.Range -> L.Token -> a) -> a
