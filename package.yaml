@@ -1,0 +1,19 @@
+name: owl
+version: 0.1.0.0
+
+extra-source-files:
+- README.md
+
+default-extensions:
+- OverloadedStrings
+
+library:
+  source-dirs: src
+  dependencies:
+  - array
+  - base
+  - bytestring
+  - pretty-simple
+  build-tools:
+  - alex
+  - happy
