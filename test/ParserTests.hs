@@ -1,6 +1,6 @@
-import Ast
+import Syntax.AST
 import qualified Data.ByteString.Lazy as B
-import Parser
+import Syntax.Parser
 import System.IO
 import Test.HUnit
 
@@ -52,6 +52,7 @@ testPrecedence = makeExampleTest "precedence.owl" $ Program decs EUnit
         DValue (Name "_") [] (mkEAdd (mkEAdd (EInt 1) (EInt 2)) (mkEMul (EInt 3) (EInt 4))),
         DValue (Name "id") [Name "x"] (mkEVar "x"),
         DValue (Name "_") [] (mkEAdd (ECall (mkEVar "id") (EInt 2)) (EInt 1)),
+        DValue (Name "_") [] (ECall (mkEVar "id") $ mkEAdd (EInt 2) (EInt 1)),
         DValue (Name "_") [] (ECond (EBool True) (EInt 1) (mkEAdd (EInt 2) (EInt 3))),
         DType (Name "sum") (TArrow TInt (TArrow TInt (TArrow TInt TInt))),
         DValue (Name "sum") [Name "x", Name "y", Name "z"] (mkEAdd (mkEAdd (mkEVar "x") (mkEVar "y")) (mkEVar "z"))

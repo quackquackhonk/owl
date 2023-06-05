@@ -1,5 +1,5 @@
 {
-module Lexer
+module Syntax.Lexer
   ( -- * Invoking Alex
     Alex
   , AlexPosn (..)
@@ -51,7 +51,7 @@ tokens :-
 <0> "/"     { tok Divide }
 
 <0> "="     { tok Eq }
-<0> "!="      { tok Neq }
+<0> "!="    { tok Neq }
 <0> "<"     { tok Lt }
 <0> ">"     { tok Gt }
 <0> "<="    { tok Lteq }

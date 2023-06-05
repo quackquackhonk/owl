@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveFoldable #-}
 
-module Ast
+module Syntax.AST
   ( Program (..),
     makeProgram,
     Name (..),
@@ -35,8 +35,7 @@ where
 import Data.ByteString.Lazy.Char8 (ByteString)
 import Data.Maybe (fromJust)
 import Data.Monoid (First (..))
-import qualified Lexer as L
-import Text.Pretty.Simple (pPrint)
+import qualified Syntax.Lexer as L
 
 -- Each constructor uses a polynomial type variable to store metadata along with the AST
 
@@ -46,7 +45,7 @@ data Program = Program [Declaration] (Expression)
 makeProgram :: [Declaration] -> Expression -> Program
 makeProgram decls exprs = Program decls exprs
 
-data Name = Name ByteString
+data Name = Name String
   deriving (Show, Eq)
 
 data Declaration

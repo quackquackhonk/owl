@@ -1,18 +1,21 @@
 {
-module Parser
+module Syntax.Parser
   ( parseOwl,
-    astFromStr
+    parseOwlStmt,
+    astFromStr,
+    stmtFromStr
   )
 where
 
-import Data.ByteString.Lazy.Char8 (ByteString)
+import Data.ByteString.Lazy.Char8 (ByteString, unpack, pack)
 
-import Ast
-import qualified Lexer as L
+import Syntax.AST
+import qualified Syntax.Lexer as L
 
 }
 
 %name parseOwl program
+%name parseOwlStmt stmt
 %tokentype { L.RangedToken }
 %error { parseError }
 %monad { L.Alex } { >>= } { pure }
@@ -95,7 +98,7 @@ program :: { Program }
 : decls expr { Program $1 $2 }
 
 name :: { Name }
-: ident { unTok $1 (\rr (L.Identifier name) -> Name name)}
+: ident { unTok $1 (\rr (L.Identifier name) -> Name $ unpack name)}
 
 decls :: { [Declaration] }
 : many(semi_decl) { $1 }
@@ -169,11 +172,11 @@ parseTVar tt =
       Name "Bool" -> TBool
       Name xx -> TVar (Name xx)
 
--- astFromStr :: ByteString -> Either (L.ParseError) (Program L.Range) 
-astFromStr str = case L.runAlex str parseOwl of
-    Left e -> error $ show e
-    Right ast -> ast
+astFromStr :: String -> Either String Program 
+astFromStr str = L.runAlex (pack str) parseOwl
 
+stmtFromStr :: String -> Either String Statement
+stmtFromStr str = L.runAlex (pack str) parseOwlStmt
 
 lexer :: (L.RangedToken -> L.Alex a) -> L.Alex a
 lexer = (=<< L.alexMonadScan)

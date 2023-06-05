@@ -14,23 +14,41 @@ extra-source-files:
 
 library
   exposed-modules:
-      Ast
-      Lexer
-      Parser
+      Syntax
+      Syntax.AST
+      Syntax.Lexer
+      Syntax.Parser
+      Syntax.Pretty
   other-modules:
       Paths_owl
   hs-source-dirs:
       src
   default-extensions:
       OverloadedStrings
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-tools:
       alex
     , happy
   build-depends:
       array
-    , base
+    , base >=4.7 && <5
     , bytestring
-    , pretty-simple
+    , text
+  default-language: Haskell2010
+
+executable pellets-exe
+  main-is: Pellets.hs
+  other-modules:
+      Paths_owl
+  hs-source-dirs:
+      bin
+  default-extensions:
+      OverloadedStrings
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , owl
+    , text
   default-language: Haskell2010
 
 test-suite owl-parser-tests
@@ -42,10 +60,11 @@ test-suite owl-parser-tests
       test
   default-extensions:
       OverloadedStrings
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       HUnit
-    , base
+    , base >=4.7 && <5
     , bytestring
     , owl
+    , text
   default-language: Haskell2010

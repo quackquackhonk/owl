@@ -11,6 +11,7 @@ let id x be x;
 
 # this is (id 2) + 1
 let _ be id 2 + 1;
+let _ be id $ 2 + 1;
 
 # this is if true then 1 else (2 + 3)
 let _ be
