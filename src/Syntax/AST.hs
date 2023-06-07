@@ -32,7 +32,6 @@ module Syntax.AST
   )
 where
 
-import Data.ByteString.Lazy.Char8 (ByteString)
 import Data.Maybe (fromJust)
 import Data.Monoid (First (..))
 import qualified Syntax.Lexer as L
@@ -46,7 +45,7 @@ makeProgram :: [Declaration] -> Expression -> Program
 makeProgram decls exprs = Program decls exprs
 
 data Name = Name String
-  deriving (Show, Eq)
+  deriving (Ord, Show, Eq)
 
 data Declaration
   = DValue Name [Name] Expression
@@ -103,34 +102,49 @@ data UnOperator
 
 -- Convenience Functions for making ASTs
 
+mkEVar :: String -> Expression
 mkEVar nn = EVar . Name $ nn
 
+mkTVar :: String -> Type
 mkTVar nn = TVar . Name $ nn
 
+mkBinOp :: BinOperator -> Expression -> Expression -> Expression
 mkBinOp op ll rr = EBinaryOp op ll rr
 
+mkEMul :: Expression -> Expression -> Expression
 mkEMul = mkBinOp BOMul
 
+mkEAdd :: Expression -> Expression -> Expression
 mkEAdd = mkBinOp BOAdd
 
+mkESub :: Expression -> Expression -> Expression
 mkESub = mkBinOp BOSub
 
+mkEDiv :: Expression -> Expression -> Expression
 mkEDiv = mkBinOp BODiv
 
+mkEEq :: Expression -> Expression -> Expression
 mkEEq = mkBinOp BOEq
 
+mkENeq :: Expression -> Expression -> Expression
 mkENeq = mkBinOp BONeq
 
+mkELt :: Expression -> Expression -> Expression
 mkELt = mkBinOp BOLt
 
+mkELtEq :: Expression -> Expression -> Expression
 mkELtEq = mkBinOp BOLtEq
 
+mkEGt :: Expression -> Expression -> Expression
 mkEGt = mkBinOp BOGt
 
+mkEGtEq :: Expression -> Expression -> Expression
 mkEGtEq = mkBinOp BOGtEq
 
+mkEAnd :: Expression -> Expression -> Expression
 mkEAnd = mkBinOp BOAnd
 
+mkEOr :: Expression -> Expression -> Expression
 mkEOr = mkBinOp BOOr
 
 

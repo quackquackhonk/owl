@@ -1,21 +1,63 @@
+import Control.Monad.State
 import Data.List (isPrefixOf)
+import Eval
+import qualified Eval.Environment as EE
+import Syntax.AST
 import Syntax.Parser (stmtFromStr)
 import Syntax.Pretty (prettyStmt)
 import System.IO
 
 main :: IO ()
 main = do
-  putStrLn "Pellets REPL :)"
-  repl
+  putStrLn "Pellets REPL"
+  repl initState
+  putStrLn "Exiting Pellets REPL..."
 
-repl :: IO ()
-repl = do
+data ReplState = ReplState
+  { env :: EE.Environment,
+    history :: [String],
+    lastResult :: ReplAction
+  }
+  deriving (Show)
+
+data ReplAction
+  = BoundValue EE.EnvScope
+  | Evaluated EE.EvalValue
+  | Error ReplError
+  deriving (Show)
+
+fromEvalResult :: EE.EvalResult -> ReplAction
+fromEvalResult (Left ee) = Error $ EvalError ee
+fromEvalResult (Right val) = Evaluated val
+
+data ReplError
+  = EvalError EE.EvalError
+  | ParseError String
+  | UnknownCommand String
+  deriving (Show)
+
+initState :: ReplState
+initState = ReplState [] [] (Evaluated EE.EVUnit)
+
+updateEnv :: EE.EnvScope -> State ReplState EE.EnvScope
+updateEnv scp = state $ \(ReplState env h l) -> (scp, ReplState (scp : env) h l)
+
+updateHist :: String -> State ReplState String
+updateHist inp = state $ \(ReplState env h l) -> (inp, ReplState env (inp : h) l)
+
+updateLast :: ReplAction -> State ReplState ReplAction
+updateLast e@(Error _) = state $ \(ReplState env h l) -> (e, ReplState env h l)
+updateLast act = state $ \(ReplState env h l) -> (act, ReplState env h act)
+
+repl :: ReplState -> IO ()
+repl st = do
   input <- promptUser
   if isREPLCommand input
     then return ()
     else do
-      processStmt input
-      repl
+      let (act, st') = runState (processInput input) st
+      displayAction act
+      repl st'
 
 prompt :: String
 prompt = "hoot> "
@@ -23,12 +65,44 @@ prompt = "hoot> "
 promptUser :: IO String
 promptUser = putStr prompt >> hFlush stdout >> getLine
 
-processStmt :: String -> IO ()
-processStmt inp = do
-  putStr prompt
-  case stmtFromStr inp of
-    Left e -> putStrLn "Error!!" >> (putStrLn $ show e)
-    Right st -> putStrLn "Got: " >> (putStrLn $ prettyStmt 0 st)
+displayAction :: ReplAction -> IO ()
+displayAction (Error err) = putStr "error: " >> print err
+displayAction (Evaluated val) = putStr "value: " >> print val
+displayAction (BoundValue sc) = putStr "bound: " >> print sc
 
 isREPLCommand :: String -> Bool
 isREPLCommand = isPrefixOf "::"
+
+processInput :: String -> State ReplState ReplAction
+processInput input = do
+  inp <- updateHist input
+  case stmtFromStr inp of
+    Left e -> state $ \st -> (Error $ ParseError e, st)
+    Right st -> processStmt st
+
+-- TODO  this doesn't feel right, there should be a  more elegant way to express this
+processStmt :: Statement -> State ReplState ReplAction
+processStmt (Expr expr) = do
+  st <- get
+  let ev = env st
+      act = fromEvalResult $ evalExpr ev expr
+  updateIt act
+  updateLast act
+processStmt (Decl decl) = do
+  st <- get
+  case evalDecl (env st) EE.emptyScope decl of
+    Left ee -> state $ \s -> (Error $ EvalError ee, s)
+    Right scp -> do
+      updateEnv scp
+      state $ \s -> (BoundValue scp, s)
+
+updateIt :: ReplAction -> State ReplState ReplAction
+updateIt ra@(Evaluated val) = do
+  updateEnv sc
+  return ra
+  where
+    sc = mkItScope val
+updateIt ra = state $ \s -> (ra, s)
+
+mkItScope :: EE.EvalValue -> EE.EnvScope
+mkItScope = EE.updateScopeValue EE.emptyScope (Name "it")
