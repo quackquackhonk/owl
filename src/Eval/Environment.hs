@@ -9,8 +9,8 @@ module Eval.Environment
     freeEntry,
     mkBlankScope,
     combineEntry,
-    updateScopeValue,
-    updateScopeType,
+    updateBinding,
+    updateScopeEntry,
     Environment,
     lookupEnv,
   )
@@ -24,7 +24,7 @@ data EvalValue
   = EVUnit
   | EVInt Integer
   | EVBool Bool
-  | EVClosure Environment Expression
+  | EVClosure Environment [Name] Expression
   deriving (Show)
 
 data EvalError
@@ -82,10 +82,18 @@ updateBinding :: Environment -> Name -> EnvEntry -> Environment
 updateBinding [] _ _ = []
 updateBinding (sc : scs) nn ent =
   case M.lookup nn sc of
-    Nothing -> updateBinding scs nn ent
-    Just ee -> let ent' = updateEntry ee ent
-                   scope = M.insert nn ent' scope
+    Nothing -> sc : scs
+    Just ee -> let ent' = ent -- ent' = updateEntry ee ent
+                   scope = M.insert nn ent' sc
                in scope : scs
+
+updateScopeEntry :: EnvScope -> Name -> EnvEntry -> EnvScope
+updateScopeEntry scp name ent = M.insert name ent' scp
+  where
+    ent' = case M.lookup name scp of
+      Just from -> updateEntry from ent
+      Nothing -> ent
+          
 
 -- | Update an entry with the information with another entry.
 updateEntry :: EnvEntry -> EnvEntry -> EnvEntry
@@ -97,20 +105,3 @@ updateEntry ff@(EnvEntry (Just fromVal) _) (EnvEntry Nothing (Just _)) = ff
 updateEntry (EnvEntry Nothing (Just fromTy)) to@(EnvEntry (Just val) Nothing) = to
 updateEntry (EnvEntry Nothing Nothing) to = to
 updateEntry from (EnvEntry Nothing Nothing) = from
-
-
-updateScopeValue :: EnvScope -> Name -> EvalValue -> EnvScope
-updateScopeValue scope name val =
-  case M.lookup name scope of
-    Nothing -> M.insert name entry scope
-    Just ent -> M.insert name (combineEntry ent entry) scope
-  where
-    entry = EnvEntry (Just val) Nothing
-
-updateScopeType :: EnvScope -> Name -> Type -> EnvScope
-updateScopeType scope name typ =
-  case M.lookup name scope of
-    Nothing -> M.insert name entry scope
-    Just ent -> M.insert name (combineEntry ent entry) scope
-  where
-    entry = EnvEntry Nothing $ Just typ

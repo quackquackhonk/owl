@@ -105,4 +105,5 @@ updateIt ra@(Evaluated val) = do
 updateIt ra = state $ \s -> (ra, s)
 
 mkItScope :: EE.EvalValue -> EE.EnvScope
-mkItScope = EE.updateScopeValue EE.emptyScope (Name "it")
+mkItScope val = EE.updateScopeEntry EE.emptyScope (Name "it") ent
+  where ent = (EE.EnvEntry (Just val) Nothing)

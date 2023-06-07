@@ -1,7 +1,5 @@
 module Eval (evalExpr, evalDecl) where
 
-import Analysis.Types (typecheck)
-import qualified Data.Map as M
 import Eval.Environment
 import Syntax.AST
 
@@ -25,16 +23,34 @@ evalExpr env (ECond condExp thenExp elseExp) =
     cond' = evalExpr env condExp
     then' = evalExpr env thenExp
     else' = evalExpr env elseExp
-evalExpr env (EFunc args body) = Right $ EVClosure (scope : env) body
+evalExpr env (EFunc args body) = Right $ EVClosure (scope : env) args body
   where
     scope = mkBlankScope args
-evalExpr env (ECall func arg) = Right EVUnit
+evalExpr env (ECall func arg) = do
+  fval <- evalExpr env func
+  aval <- evalExpr env arg
+  evalCall fval aval
 evalExpr env (ESeq stmts) = evalStmts env emptyScope stmts
 
+evalCall :: EvalValue -> EvalValue -> EvalResult
+evalCall (EVClosure _ [] _) _ = Left EETypeError
+evalCall (EVClosure env [aa] body) arg =  evalExpr env' body
+  where
+    env' = updateBinding env aa (EnvEntry (Just arg) Nothing)
+evalCall (EVClosure env (aa : args) body) arg = Right $ EVClosure env' args body
+  where
+    env' = updateBinding env aa (EnvEntry (Just arg) Nothing)
+evalCall _ _ = Left EETypeError
+
+-- if no next argument, type error
+-- else: eval arg, enter into cEnv
+-- if last argument: eval body in cEnv
+-- else: return modified closure
 evalStmts :: Environment -> EnvScope -> [Statement] -> EvalResult
 evalStmts _ _ [] = Right EVUnit
 evalStmts env scp [stmt] = res
-  where (_, res) = evalStmt env scp stmt
+  where
+    (_, res) = evalStmt env scp stmt
 evalStmts env scp (stmt : stmts) = evalStmts env scp' stmts
   where
     (scp', _) = evalStmt env scp stmt
@@ -69,7 +85,7 @@ truthy EVUnit = False
 truthy (EVInt 0) = False
 truthy (EVInt _) = True
 truthy (EVBool b) = b
-truthy (EVClosure _ _) = True
+truthy (EVClosure {}) = True
 
 arithBinop :: (Integer -> Integer -> Integer) -> EvalValue -> EvalValue -> EvalResult
 arithBinop f (EVInt rr) (EVInt ll) = Right (EVInt $ f ll rr)
@@ -97,9 +113,13 @@ evalUnaryOp env op expr =
 -- | Bound expressions are evaluated in an environment containing all its arguments.
 -- | The returned scope does not contain those free bindings.
 evalDecl :: Environment -> EnvScope -> Declaration -> Either EvalError EnvScope
-evalDecl env scope (DValue nn args expr) = do
-  let scope' = mkBlankScope args
-      env' = scope' : env
-  val <- evalExpr env' expr
-  Right $ updateScopeValue scope nn val
-evalDecl _ scope (DType nn typ') = Right $ updateScopeType scope nn typ'
+evalDecl env scope (DValue nn [] expr) = do
+  val <- evalExpr env expr
+  Right $ updateScopeEntry scope nn (EnvEntry (Just val) Nothing)
+evalDecl env scope (DValue nn args expr) = Right $ updateScopeEntry scope nn (EnvEntry (Just val) Nothing)
+  where
+    scope' = mkBlankScope args
+    env' = scope' : env
+    val = EVClosure env' args expr
+evalDecl _ scope (DType nn typ') =
+  Right $ updateScopeEntry scope nn $ EnvEntry Nothing (Just typ')
