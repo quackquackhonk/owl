@@ -17,7 +17,9 @@ library
       Analysis
       Analysis.Types
       Eval
+      Eval.Data
       Eval.Environment
+      Eval.Pretty
       Syntax
       Syntax.AST
       Syntax.Lexer

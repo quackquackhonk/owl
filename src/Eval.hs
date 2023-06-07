@@ -1,6 +1,7 @@
 module Eval (evalExpr, evalDecl) where
 
-import Eval.Environment
+import Eval.Data
+import Eval.Pretty
 import Syntax.AST
 
 -- | Evaluates the given Expression in the given Environment, returning an EvalValue

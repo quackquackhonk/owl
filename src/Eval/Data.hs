@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wno-unused-matches #-}
-module Eval.Environment
+module Eval.Data
   ( EvalValue (..),
     EvalError (..),
     EvalResult,
@@ -27,12 +27,12 @@ data EvalValue
   | EVClosure Environment [Name] Expression
   deriving (Show)
 
+type EvalResult = Either EvalError EvalValue
+
 data EvalError
   = EEUndefined Name
   | EETypeError
   deriving (Show)
-
-type EvalResult = Either EvalError EvalValue
 
 data EnvEntry = EnvEntry { value :: Maybe EvalValue, type' :: Maybe Type }
   deriving (Show)

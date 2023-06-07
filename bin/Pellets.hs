@@ -1,7 +1,7 @@
 import Control.Monad.State
 import Data.List (isPrefixOf)
-import Eval
-import qualified Eval.Environment as EE
+import qualified Eval.Pretty as EP
+import qualified Eval.Data as ED
 import Syntax.AST
 import Syntax.Parser (stmtFromStr)
 import Syntax.Pretty (prettyStmt)
@@ -14,32 +14,32 @@ main = do
   putStrLn "Exiting Pellets REPL..."
 
 data ReplState = ReplState
-  { env :: EE.Environment,
+  { env :: ED.Environment,
     history :: [String],
     lastResult :: ReplAction
   }
   deriving (Show)
 
 data ReplAction
-  = BoundValue EE.EnvScope
-  | Evaluated EE.EvalValue
+  = BoundValue ED.EnvScope
+  | Evaluated ED.EvalValue
   | Error ReplError
   deriving (Show)
 
-fromEvalResult :: EE.EvalResult -> ReplAction
+fromEvalResult :: ED.EvalResult -> ReplAction
 fromEvalResult (Left ee) = Error $ EvalError ee
 fromEvalResult (Right val) = Evaluated val
 
 data ReplError
-  = EvalError EE.EvalError
+  = EvalError ED.EvalError
   | ParseError String
   | UnknownCommand String
   deriving (Show)
 
 initState :: ReplState
-initState = ReplState [] [] (Evaluated EE.EVUnit)
+initState = ReplState [] [] (Evaluated ED.EVUnit)
 
-updateEnv :: EE.EnvScope -> State ReplState EE.EnvScope
+updateEnv :: ED.EnvScope -> State ReplState ED.EnvScope
 updateEnv scp = state $ \(ReplState env h l) -> (scp, ReplState (scp : env) h l)
 
 updateHist :: String -> State ReplState String
@@ -90,7 +90,7 @@ processStmt (Expr expr) = do
   updateLast act
 processStmt (Decl decl) = do
   st <- get
-  case evalDecl (env st) EE.emptyScope decl of
+  case evalDecl (env st) ED.emptyScope decl of
     Left ee -> state $ \s -> (Error $ EvalError ee, s)
     Right scp -> do
       updateEnv scp
@@ -104,6 +104,6 @@ updateIt ra@(Evaluated val) = do
     sc = mkItScope val
 updateIt ra = state $ \s -> (ra, s)
 
-mkItScope :: EE.EvalValue -> EE.EnvScope
-mkItScope val = EE.updateScopeEntry EE.emptyScope (Name "it") ent
-  where ent = (EE.EnvEntry (Just val) Nothing)
+mkItScope :: ED.EvalValue -> ED.EnvScope
+mkItScope val = ED.updateScopeEntry ED.emptyScope (Name "it") ent
+  where ent = (ED.EnvEntry (Just val) Nothing)
