@@ -1,0 +1,25 @@
+# showcasing some of the precedence rules
+
+
+# should parse as ((1 + 2) + 3) + 4
+let _ be 1 + 2 + 3 + 4;
+
+# should parse as (1 + 2) + (3 + 4)
+let _ be 1 + 2 + 3 * 4;
+
+let id x be x;
+
+# this is (id 2) + 1
+let _ be id 2 + 1;
+let _ be id $ 2 + 1;
+
+# this is if true then 1 else (2 + 3)
+let _ be
+  if true then 1 else 2 + 3;
+
+# Int -> (Int -> (Int -> Int))
+typ sum is Int -> Int -> Int -> Int;
+let sum x y z be
+  x + y + z;
+
+()
