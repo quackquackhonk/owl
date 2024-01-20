@@ -2,7 +2,7 @@ use logos::Logos;
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
 pub enum Token {
-    #[regex(r"[a-zA-Z_][a-zA-Z!?'_]*", |lex| lex.slice().to_string())]
+    #[regex(r"[a-zA-Z_][a-zA-Z?'_]*", |lex| lex.slice().to_string())]
     ID(String),
     #[regex(r"[-]?[0-9]+", |lex| lex.slice().to_string())]
     Num(String),
@@ -49,7 +49,21 @@ pub enum Token {
     LParen,
     #[token(")")]
     RParen,
+    #[token("!")]
+    Bang,
+    #[token("=")]
+    Eq,
+    #[token("&")]
+    And,
+    #[token("|")]
+    Or,
+    #[token("<")]
+    Lt,
+    #[token(">")]
+    Gt,
 
     #[regex(r"[ \t\f\n]+", logos::skip)]
     Whitespace,
+    #[regex(r"#.*\n", logos::skip)]
+    Comment,
 }

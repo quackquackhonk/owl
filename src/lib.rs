@@ -1,4 +1,5 @@
 pub mod syntax;
+pub mod repl;
 
 #[cfg(test)]
 mod tests {
