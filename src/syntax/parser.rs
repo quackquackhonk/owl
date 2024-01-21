@@ -247,7 +247,7 @@ fn parse_type<'tokens>(
     })
 }
 
-fn parse_stmt<'tokens>(
+pub fn parse_stmt<'tokens>(
 ) -> impl Parser<'tokens, ParserInput<'tokens>, Spanned<Statement>, ParserError<'tokens>> {
     let expr_stmt = parse_expr().map(|(expr, expr_sp)| (Statement::Expr(expr), expr_sp));
     let decl_stmt = parse_decl().map(|(decl, decl_sp)| (Statement::Decl(decl), decl_sp));
@@ -259,7 +259,7 @@ fn parse_stmt<'tokens>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::syntax::lexer::lex_owl;
+    use crate::syntax::lexer::lexer;
     use rstest::rstest;
     use std::fs::File;
     use std::io::Read;
@@ -276,7 +276,7 @@ mod tests {
         let mut file = File::open(path)?;
         let mut source = String::new();
         file.read_to_string(&mut source)?;
-        let tokens = lex_owl(&source);
+        let tokens = lexer(&source);
 
         unimplemented!()
     }
