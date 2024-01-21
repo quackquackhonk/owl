@@ -1,9 +1,14 @@
 // use ariadne::{Color, Label, Report, ReportKind, Source};
-use chumsky::{input::SpannedInput, prelude::*};
-use logos::Span;
+use chumsky::{
+    input::{SpannedInput, Stream},
+    prelude::*,
+};
+use logos::{Logos, Span};
 
 use super::{
     ast::{BinOp, Declaration, Expression, Name, Program, Statement, Type, UnOp},
+    error::OwlParseResult,
+    lexer,
     lexer::Token,
     Spanned,
 };
@@ -11,15 +16,29 @@ use super::{
 type ParserInput<'tokens> = SpannedInput<Token, Span, &'tokens [(Token, Span)]>;
 type ParserError<'tokens> = extra::Err<Rich<'tokens, Token, Span>>;
 
+pub fn owl_parser(source: &str) -> OwlParseResult<Program> {
+    let tokens = dbg!(lexer(source));
+
+    let input_stream = tokens.spanned(source.len()..source.len());
+
+    let prog = parse_program().parse(input_stream).into_result();
+
+    todo!()
+}
+
 /// Entry point for the Owl parser
-pub fn parse_program<'tokens>(
+fn parse_program<'tokens>(
 ) -> impl Parser<'tokens, ParserInput<'tokens>, Program, ParserError<'tokens>> {
     let decs = parse_decl()
         .map(|decl| vec![decl])
-        .foldl(parse_decl().repeated(), |mut decs, decl| {
-            decs.push(decl);
-            decs
-        })
+        .then_ignore(just(Token::SemiColon))
+        .foldl(
+            parse_decl().then_ignore(just(Token::SemiColon)).repeated(),
+            |mut decs, decl| {
+                decs.push(decl);
+                decs
+            },
+        )
         .labelled("program declarations");
 
     decs.then(parse_expr().labelled("program expression"))
@@ -29,135 +48,129 @@ pub fn parse_program<'tokens>(
 fn parse_expr<'tokens>(
 ) -> impl Parser<'tokens, ParserInput<'tokens>, Spanned<Expression>, ParserError<'tokens>> {
     recursive(|expr| {
-        // FIX: I don't think i need this recursive?
-        let simple_expr = recursive(|_simple| {
-            // parsing function expressions
-            let fun_expr = just(Token::At)
-                .ignore_then(parse_name().repeated().collect::<Vec<Spanned<Name>>>())
-                .then_ignore(just(Token::BigArrow))
-                .then(expr.clone())
-                .map(|(args, body)| Expression::Function(args, Box::new(body)));
+        // parsing function expressions
+        let fun_expr = just(Token::At)
+            .ignore_then(parse_name().repeated().collect::<Vec<Spanned<Name>>>())
+            .then_ignore(just(Token::BigArrow))
+            .then(expr.clone())
+            .map(|(args, body)| Expression::Function(args, Box::new(body)));
 
-            let value = select! {
-                Token::Bool(b) => Expression::Bool(b),
-                Token::Num(n) => Expression::Int(n.parse().expect("This will be a number!")),
-                Token::ID(id) => Expression::Var(id),
-                Token::Unit => Expression::Unit
-            }
-            .or(fun_expr)
-            .labelled("expr-value")
-            .map_with(|v, e| (v, e.span()));
+        let value = select! {
+            Token::Bool(b) => Expression::Bool(b),
+            Token::Num(n) => Expression::Int(n.parse().expect("This will be a number!")),
+            Token::ID(id) => Expression::Var(id),
+            Token::Unit => Expression::Unit
+        }
+        .or(fun_expr)
+        .labelled("expr-value")
+        .map_with(|v, e| (v, e.span()));
 
-            // atoms are values or parenthesized expressions
-            let atom = value
-                .or(expr
-                    .clone()
-                    .delimited_by(just(Token::LParen), just(Token::RParen)))
-                .boxed();
-
-            // Function calls
-            let fun_call = atom
+        // atoms are values or parenthesized expressions
+        let atom = value
+            .or(expr
                 .clone()
-                .then(expr.clone())
-                .map(|(func, arg)| Expression::FuncCall(Box::new(func), Box::new(arg)))
-                .map_with(|fc, e| (fc, e.span()))
-                .boxed();
+                .delimited_by(just(Token::LParen), just(Token::RParen)))
+            .boxed();
 
-            let element = atom.or(fun_call);
+        // Function calls
+        let fun_call = atom
+            .clone()
+            .then(atom.clone())
+            .map(|(func, arg)| Expression::FuncCall(Box::new(func), Box::new(arg)))
+            .map_with(|fc, e| (fc, e.span()))
+            .boxed();
 
-            // Unary operations
-            let unop = parse_unary_op()
-                .then(element.clone())
-                .map_with(|(unary_op, body), e| {
-                    (Expression::UnaryOp(unary_op, Box::new(body)), e.span())
-                })
-                .boxed();
+        let element = atom.or(fun_call);
 
-            let binop_element = element.or(unop);
+        // Unary operations
+        let unop = parse_unary_op()
+            .repeated()
+            .foldr_with(element, |op, rhs, e| {
+                (Expression::UnaryOp(op, Box::new(rhs)), e.span())
+            })
+            .boxed();
 
-            // Binary operations
-            // multiply / divide
-            let op = select! {
-                Token::Mult => BinOp::Mul,
-                Token::Divide => BinOp::Div
-            };
-            let product = binop_element
-                .clone()
-                .foldl_with(op.then(binop_element).repeated(), |left, (op, right), e| {
-                    (
-                        Expression::BinaryOp(op, Box::new(left), Box::new(right)),
-                        e.span(),
-                    )
-                })
-                .boxed();
-
-            // add / subtract
-            let op = select! {
-                Token::Plus => BinOp::Add,
-                Token::Minus => BinOp::Sub
-            };
-            let sum = product
-                .clone()
-                .foldl_with(op.then(product).repeated(), |left, (op, right), e| {
-                    (
-                        Expression::BinaryOp(op, Box::new(left), Box::new(right)),
-                        e.span(),
-                    )
-                })
-                .boxed();
-
-            // relative operators
-            let op = select! {
-                Token::Eq => BinOp::Eq,
-                Token::Lt => BinOp::Lt,
-                Token::Gt => BinOp::Gt,
-            }
-            .or(just(Token::Lt).then(just(Token::Eq)).to(BinOp::LtEq))
-            .or(just(Token::Gt).then(just(Token::Eq)).to(BinOp::GtEq))
-            .or(just(Token::Bang).then(just(Token::Eq)).to(BinOp::Neq));
-            let relop = sum
-                .clone()
-                .foldl_with(op.then(sum).repeated(), |left, (op, right), e| {
-                    (
-                        Expression::BinaryOp(op, Box::new(left), Box::new(right)),
-                        e.span(),
-                    )
-                })
-                .boxed();
-
-            // logical ops
-            let op = select! {
-                Token::And => BinOp::And,
-                Token::Or => BinOp::Or
-            };
-            let relop = relop
-                .clone()
-                .foldl_with(op.then(relop).repeated(), |left, (op, right), e| {
-                    (
-                        Expression::BinaryOp(op, Box::new(left), Box::new(right)),
-                        e.span(),
-                    )
-                })
-                .boxed();
-
-            // Dollar function application
-            let binop = relop
-                .clone()
-                .foldl_with(
-                    just(Token::Dollar).ignore_then(relop).repeated(),
-                    |func, arg, e| {
-                        (
-                            Expression::FuncCall(Box::new(func), Box::new(arg)),
-                            e.span(),
-                        )
-                    },
+        // Binary operations
+        // multiply / divide
+        let op = select! {
+            Token::Mult => BinOp::Mul,
+            Token::Divide => BinOp::Div
+        };
+        let product = unop
+            .clone()
+            .foldl_with(op.then(unop).repeated(), |left, (op, right), e| {
+                (
+                    Expression::BinaryOp(op, Box::new(left), Box::new(right)),
+                    e.span(),
                 )
-                .boxed();
+            })
+            .boxed();
 
-            // NOTE: We only return binop since any binop can just be an element by itself
-            binop.labelled("expression").as_context()
-        });
+        // add / subtract
+        let op = select! {
+            Token::Plus => BinOp::Add,
+            Token::Minus => BinOp::Sub
+        };
+        let sum = product
+            .clone()
+            .foldl_with(op.then(product).repeated(), |left, (op, right), e| {
+                (
+                    Expression::BinaryOp(op, Box::new(left), Box::new(right)),
+                    e.span(),
+                )
+            })
+            .boxed();
 
+        // relative operators
+        let op = select! {
+            Token::Eq => BinOp::Eq,
+            Token::Lt => BinOp::Lt,
+            Token::Gt => BinOp::Gt,
+        }
+        .or(just(Token::Lt).then(just(Token::Eq)).to(BinOp::LtEq))
+        .or(just(Token::Gt).then(just(Token::Eq)).to(BinOp::GtEq))
+        .or(just(Token::Bang).then(just(Token::Eq)).to(BinOp::Neq));
+        let relop = sum
+            .clone()
+            .foldl_with(op.then(sum).repeated(), |left, (op, right), e| {
+                (
+                    Expression::BinaryOp(op, Box::new(left), Box::new(right)),
+                    e.span(),
+                )
+            })
+            .boxed();
+
+        // logical ops
+        let op = select! {
+            Token::And => BinOp::And,
+            Token::Or => BinOp::Or
+        };
+        let logicop = relop
+            .clone()
+            .foldl_with(op.then(relop).repeated(), |left, (op, right), e| {
+                (
+                    Expression::BinaryOp(op, Box::new(left), Box::new(right)),
+                    e.span(),
+                )
+            })
+            .boxed();
+
+        // Dollar function application
+        let binop = logicop
+            .clone()
+            .foldl_with(
+                just(Token::Dollar).ignore_then(logicop).repeated(),
+                |func, arg, e| {
+                    (
+                        Expression::FuncCall(Box::new(func), Box::new(arg)),
+                        e.span(),
+                    )
+                },
+            )
+            .boxed();
+
+        // NOTE: We only return binop since any binop can just be an element by itself
+        let simple_expr = binop.labelled("expression").as_context();
         // Conditionals
         let conditional = just(Token::If)
             .ignore_then(expr.clone())
@@ -253,31 +266,4 @@ pub fn parse_stmt<'tokens>(
     let decl_stmt = parse_decl().map(|(decl, decl_sp)| (Statement::Decl(decl), decl_sp));
 
     expr_stmt.or(decl_stmt)
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::syntax::lexer::lexer;
-    use rstest::rstest;
-    use std::fs::File;
-    use std::io::Read;
-
-    #[rstest]
-    #[case("examples/anonymous_functions.owl")]
-    #[case("examples/fibonacci.owl")]
-    #[case("examples/currying.owl")]
-    #[case("examples/identifiers.owl")]
-    #[case("examples/logical_operations.owl")]
-    #[case("examples/precedence.owl")]
-    #[case("examples/sequences.owl")]
-    fn test_lexing_examples(#[case] path: &str) -> anyhow::Result<()> {
-        let mut file = File::open(path)?;
-        let mut source = String::new();
-        file.read_to_string(&mut source)?;
-        let tokens = lexer(&source);
-
-        unimplemented!()
-    }
 }

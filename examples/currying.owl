@@ -12,4 +12,4 @@ let sum3 be sum4 1;
 typ sum1 is Int -> Int;
 let sum1 be sum3 2 $ 5 + 5;
 
-20 = sum1 7
+20 = sum 7

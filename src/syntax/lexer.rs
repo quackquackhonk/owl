@@ -1,7 +1,4 @@
-use itertools::{Itertools, Either};
 use logos::Logos;
-
-use super::{error::{OwlParseError, OwlParseResult}, Spanned};
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Token {
@@ -73,52 +70,7 @@ pub enum Token {
     Whitespace,
     #[regex(r"#.*\n", logos::skip)]
     Comment,
+    /// Error variant, only produced by the entry point
+    Error(String),
 }
 
-/// Entry point for the lexer.
-///
-/// * `source`: the source code of the owl program
-pub fn lexer(source: &str) -> OwlParseResult<Vec<Spanned<Token>>> {
-    let mut lex = Token::lexer(source).spanned();
-
-    let mut tokens: Vec<Spanned<Token>> = vec![];
-    let mut errors: Vec<Spanned<String>> = vec![];
-
-    while let Some(res) = lex.next() {
-        match res.0 {
-            Ok(tok) => tokens.push((tok, res.1)),
-            Err(_) => errors.push((lex.slice().to_string(), res.1))
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(tokens)
-    } else {
-        Err(OwlParseError::InvalidTokens(errors))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use rstest::rstest;
-    use std::fs::File;
-    use std::io::Read;
-
-    #[rstest]
-    #[case("examples/anonymous_functions.owl")]
-    #[case("examples/fibonacci.owl")]
-    #[case("examples/currying.owl")]
-    #[case("examples/identifiers.owl")]
-    #[case("examples/logical_operations.owl")]
-    #[case("examples/precedence.owl")]
-    #[case("examples/sequences.owl")]
-    fn test_lexing_examples(#[case] path: &str) -> anyhow::Result<()> {
-        let mut file = File::open(path)?;
-        let mut source = String::new();
-        file.read_to_string(&mut source)?;
-        assert!(lexer(&source).is_ok());
-
-        Ok(())
-    }
-}

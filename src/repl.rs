@@ -1,12 +1,7 @@
 use chumsky::{input::Input, Parser};
 use rustyline::{error::ReadlineError, DefaultEditor};
 
-use crate::syntax::{
-    ast::{self, Statement},
-    lexer::lexer,
-    parser::parse_stmt,
-    Spanned,
-};
+use crate::syntax::{lexer, parser::parse_stmt};
 
 pub fn owl_repl() -> anyhow::Result<()> {
     let mut rl = DefaultEditor::new()?;
@@ -45,8 +40,8 @@ pub fn owl_repl() -> anyhow::Result<()> {
 
 fn process_line(line: String) -> anyhow::Result<()> {
     let len = line.len();
-    // TODO: better error handling on lexer errors
-    let toks = lexer(&line)?;
+
+    let toks = lexer(&line);
 
     let stmt = parse_stmt().parse(toks.spanned(len..len));
 

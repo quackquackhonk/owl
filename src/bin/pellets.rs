@@ -1,8 +1,7 @@
 use std::{fs::File, io::Read};
 
 use clap::Parser;
-use logos::Logos;
-use owl::{syntax::lexer::Token, repl};
+use owl::{repl, syntax::parser::owl_parser};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -26,8 +25,9 @@ fn compile_owl(path: String) -> anyhow::Result<()> {
     let mut file = File::open(path)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
-    let token_iter = Token::lexer(&contents).collect::<Vec<Result<Token, ()>>>();
-    println!("{:?}", token_iter);
+
+    let prog = owl_parser(&contents)?;
+    println!("{:?}", prog);
 
     Ok(())
 }

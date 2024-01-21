@@ -5,7 +5,7 @@ use super::Spanned;
 #[derive(Debug, Error)]
 pub enum OwlParseError {
     #[error("Invalid tokens found: {0:?}")]
-    InvalidTokens(Vec<Spanned<String>>),
+    LexerError(Vec<Spanned<String>>),
 }
 
 pub type OwlParseResult<T> = Result<T, OwlParseError>;
