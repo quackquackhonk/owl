@@ -30,7 +30,7 @@ fn parse_expr<'tokens>(
 ) -> impl Parser<'tokens, ParserInput<'tokens>, Spanned<Expression>, ParserError<'tokens>> {
     recursive(|expr| {
         // FIX: I don't think i need this recursive?
-        let simple_expr = recursive(|simple| {
+        let simple_expr = recursive(|_simple| {
             // parsing function expressions
             let fun_expr = just(Token::At)
                 .ignore_then(parse_name().repeated().collect::<Vec<Spanned<Name>>>())

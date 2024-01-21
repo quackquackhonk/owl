@@ -34,6 +34,6 @@ pub fn owl_repl() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn process_line(line: String) -> anyhow::Result<()> {
+fn process_line(_line: String) -> anyhow::Result<()> {
     todo!()
 }
