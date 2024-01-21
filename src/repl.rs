@@ -33,3 +33,7 @@ pub fn owl_repl() -> anyhow::Result<()> {
     rl.save_history("pellets-history.txt")?;
     Ok(())
 }
+
+fn process_line(line: String) -> anyhow::Result<()> {
+    todo!()
+}

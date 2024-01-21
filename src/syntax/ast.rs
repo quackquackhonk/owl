@@ -1,7 +1,15 @@
+use super::Spanned;
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Program {
-    pub decls: Vec<Declaration>,
-    pub expr: Expression,
+    pub decls: Vec<Spanned<Declaration>>,
+    pub expr: Spanned<Expression>,
+}
+
+impl Program {
+    pub fn new(decls: Vec<Spanned<Declaration>>, expr: Spanned<Expression>) -> Self {
+        Program { decls, expr }
+    }
 }
 
 pub type Name = String;
@@ -18,8 +26,8 @@ pub enum Type {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Declaration {
-    Value(Name, Vec<Name>, Expression),
-    Type(Name, Type),
+    Value(Name, Vec<Name>, Spanned<Expression>),
+    Type(Name, Spanned<Type>),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -28,13 +36,13 @@ pub enum Expression {
     Int(isize),
     Bool(bool),
     Var(Name),
-    Paren(Box<Expression>),
-    BinaryOp(BinOp, Box<Expression>, Box<Expression>),
-    UnaryOp(UnOp, Box<Expression>),
-    Conditional(Box<Expression>, Box<Expression>, Box<Expression>),
-    Function(Vec<Name>, Box<Expression>),
-    FuncCall(Box<Expression>, Box<Expression>),
-    Sequence(Vec<Statement>)
+    Paren(Box<Spanned<Expression>>),
+    BinaryOp(BinOp, Box<Spanned<Expression>>, Box<Expression>),
+    UnaryOp(UnOp, Box<Spanned<Expression>>),
+    Conditional(Box<Spanned<Expression>>, Box<Expression>, Box<Expression>),
+    Function(Vec<Spanned<Name>>, Box<Spanned<Expression>>),
+    FuncCall(Box<Spanned<Expression>>, Box<Expression>),
+    Sequence(Vec<Spanned<Statement>>)
 }
 
 #[derive(Debug, PartialEq, Eq)]

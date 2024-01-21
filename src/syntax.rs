@@ -1,4 +1,8 @@
+use logos::Span;
+
 pub mod ast;
-pub mod parse;
+pub mod parser;
 pub mod lexer;
 pub mod error;
+
+pub type Spanned<T> = (T, Span);
