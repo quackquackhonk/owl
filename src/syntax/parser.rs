@@ -98,12 +98,15 @@ fn parse_expr<'tokens>(
             };
             let product = unop
                 .clone()
-                .foldl_with(op.then(simple_expr.clone()).repeated(), |left, (op, right), e| {
-                    (
-                        Expression::BinaryOp(op, Box::new(left), Box::new(right)),
-                        e.span(),
-                    )
-                })
+                .foldl_with(
+                    op.then(simple_expr.clone()).repeated(),
+                    |left, (op, right), e| {
+                        (
+                            Expression::BinaryOp(op, Box::new(left), Box::new(right)),
+                            e.span(),
+                        )
+                    },
+                )
                 .boxed();
 
             // add / subtract
@@ -113,12 +116,15 @@ fn parse_expr<'tokens>(
             };
             let sum = product
                 .clone()
-                .foldl_with(op.then(simple_expr.clone()).repeated(), |left, (op, right), e| {
-                    (
-                        Expression::BinaryOp(op, Box::new(left), Box::new(right)),
-                        e.span(),
-                    )
-                })
+                .foldl_with(
+                    op.then(simple_expr.clone()).repeated(),
+                    |left, (op, right), e| {
+                        (
+                            Expression::BinaryOp(op, Box::new(left), Box::new(right)),
+                            e.span(),
+                        )
+                    },
+                )
                 .boxed();
 
             // relative operators
@@ -193,14 +199,18 @@ fn parse_expr<'tokens>(
             })
             .map_with(|c, e| (c, e.span()))
             .boxed();
-        //
-        // // Blocks
-        // let block = parse_stmt()
-        //     .separated_by(just(Token::SemiColon))
-        //     .collect::<Vec<Spanned<Statement>>>()
-        //     .delimited_by(just(Token::LBrace), just(Token::RBrace))
-        //     .map_with(|stmts, e| (Expression::Block(stmts), e.span()))
-        //     .boxed();
+
+        // Blocks
+        let block = expr
+            .clone()
+            .delimited_by(just(Token::LBrace), just(Token::RBrace));
+
+        let block = parse_stmt()
+            .separated_by(just(Token::SemiColon))
+            .collect::<Vec<Spanned<Statement>>>()
+            .delimited_by(just(Token::LBrace), just(Token::RBrace))
+            .map_with(|stmts, e| (Expression::Block(stmts), e.span()))
+            .boxed();
 
         // simple.or(conditional).or(block)
         simple.or(conditional)
