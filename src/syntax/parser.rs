@@ -7,7 +7,6 @@ use logos::{Logos, Span};
 
 use super::{
     ast::{BinOp, Declaration, Expression, Name, Program, Statement, Type, UnOp},
-    error::OwlParseResult,
     lexer,
     lexer::Token,
     Spanned,
@@ -16,14 +15,17 @@ use super::{
 type ParserInput<'tokens> = SpannedInput<Token, Span, &'tokens [(Token, Span)]>;
 type ParserError<'tokens> = extra::Err<Rich<'tokens, Token, Span>>;
 
-pub fn owl_parser(source: &str) -> OwlParseResult<Program> {
-    let tokens = dbg!(lexer(source));
+pub fn owl_parser(source: &str) -> anyhow::Result<Program> {
+    let tokens = lexer(source);
 
     let input_stream = tokens.spanned(source.len()..source.len());
 
-    let prog = parse_program().parse(input_stream).into_result();
-
-    todo!()
+    let parse_output = parse_program().parse(input_stream).into_result();
+    match parse_output {
+        // TODO: Error handling with ariadne
+        Err(parse_errs) => panic!("Parsing errors encountered!"),
+        Ok(prog) => Ok(prog),
+    }
 }
 
 /// Entry point for the Owl parser
@@ -201,19 +203,46 @@ fn parse_expr<'tokens>(
             .boxed();
 
         // Blocks
-        let block = expr
-            .clone()
-            .delimited_by(just(Token::LBrace), just(Token::RBrace));
+        // let block_start = block.or(conditional.clone());
+        //
+        // let block_chain = block_start
+        //     .clone()
+        //     .map(|(e, sp)| vec![(Statement::Expr(e), sp)])
+        //     .foldl(block_start.clone().repeated(), |mut exs, (ex, sp)| {
+        //         exs.push((Statement::Expr(ex), sp));
+        //         exs
+        //     });
+        //
+        // let dec_start = parse_decl().map(|(d, sp)| vec![(Statement::Decl(d), sp)]);
+        //
+        // let block = block_chain
+        //     .or(dec_start)
+        //     .foldl(
+        //         just(Token::SemiColon).ignore_then(parse_stmt()).repeated(),
+        //         |mut stmts, stmt| {
+        //             stmts.push(stmt);
+        //             stmts
+        //         },
+        //     )
+        //     .map_with(|sts, e| (Expression::Block(sts), e.span()))
+        //     .boxed();
 
         let block = parse_stmt()
-            .separated_by(just(Token::SemiColon))
-            .collect::<Vec<Spanned<Statement>>>()
+            .map(|st| vec![st])
+            .foldl(
+                just(Token::SemiColon).ignore_then(parse_stmt()).repeated(),
+                |mut sts, st| {
+                    sts.push(st);
+                    sts
+                },
+            )
             .delimited_by(just(Token::LBrace), just(Token::RBrace))
-            .map_with(|stmts, e| (Expression::Block(stmts), e.span()))
+            .map_with(|sts, e| (Expression::Block(sts), e.span()))
             .boxed();
 
         // simple.or(conditional).or(block)
-        simple.or(conditional)
+        // simple.or(conditional)
+        simple.or(conditional).or(block)
     })
 }
 

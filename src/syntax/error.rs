@@ -8,6 +8,4 @@ pub enum OwlParseError {
     LexerError(Vec<Spanned<String>>),
 }
 
-pub type OwlParseResult<T> = Result<T, OwlParseError>;
-
 // TODO: Manually implement display for pretty printing?
