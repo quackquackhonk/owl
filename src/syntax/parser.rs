@@ -1,14 +1,12 @@
 use std::{fs::File, io::Read, iter::Peekable};
 
-use itertools::peek_nth;
 use logos::{Lexer, Logos, SpannedIter};
 
-// use ariadne::{Color, Label, Report, ReportKind, Source};
 use super::{
-    ast::{Declaration, Expression, Program},
-    error::OwlParseError,
+    ast::{Declaration, Expression, Name, Program, Type},
+    error::{OwlParseError, produce_error_report},
     lexer::{lexer, Token},
-    Spanned,
+    span_add, Span, Spanned,
 };
 
 type InputIter = Peekable<std::vec::IntoIter<Spanned<Token>>>;
@@ -24,10 +22,13 @@ pub fn owl_program_parser(path: &str) -> anyhow::Result<Program> {
     let mut lex = lexer(&source).into_iter().peekable();
 
     let (prog, errs) = parse_program(&mut lex)?;
-    
-    // TODO: Produce error report with ariadne
 
-    Ok(prog)
+    if errs.is_empty() {
+        Ok(prog)
+    } else {
+        Err(produce_error_report(errs).into())
+    }
+
 }
 
 fn parse_program(lex: &mut InputIter) -> anyhow::Result<(Program, Vec<OwlParseError>)> {
@@ -41,17 +42,21 @@ fn parse_program(lex: &mut InputIter) -> anyhow::Result<(Program, Vec<OwlParseEr
 /// Attempts to parse the given token exactly.
 ///
 /// If another token is found, we keep parsing as if we found the requested token.
-fn expect_tok(tok: Token, lex: &mut InputIter, errors: &mut Vec<OwlParseError>) -> anyhow::Result<()> {
+fn expect_tok(
+    tok: Token,
+    lex: &mut InputIter,
+    errors: &mut Vec<OwlParseError>,
+) -> anyhow::Result<Span> {
     match lex.next() {
-        Some((found, _)) if found == tok => Ok(()),
-        Some((other, sp)) => {
+        Some((found, sp)) if found == tok => Ok(sp),
+        Some(found) => {
             errors.push(OwlParseError::UnexpectedToken {
-                expected: tok,
-                found: (other, sp),
+                expected: Some(tok),
+                found: found.clone()
             });
 
-            Ok(())
-        },
+            Ok(found.1)
+        }
         None => Err(OwlParseError::EndOfInput.into()),
     }
 }
@@ -59,7 +64,10 @@ fn expect_tok(tok: Token, lex: &mut InputIter, errors: &mut Vec<OwlParseError>) 
 /// Parses semicolon separated declarations, returning the declarations and any recoverable errors
 ///
 /// * `lex`: the token iterator
-fn parse_declarations(lex: &mut InputIter, errors: &mut Vec<OwlParseError>) -> anyhow::Result<Vec<Spanned<Declaration>>> {
+fn parse_declarations(
+    lex: &mut InputIter,
+    errors: &mut Vec<OwlParseError>,
+) -> anyhow::Result<Vec<Spanned<Declaration>>> {
     let mut errors = vec![];
     let mut decs: Vec<Spanned<Declaration>> = vec![];
 
@@ -94,16 +102,89 @@ fn parse_declarations(lex: &mut InputIter, errors: &mut Vec<OwlParseError>) -> a
     Ok(decs)
 }
 
-fn parse_value_declaration(lex: &mut InputIter, errors: &mut Vec<OwlParseError>) -> anyhow::Result<Spanned<Declaration>> {
+fn parse_name(
+    lex: &mut InputIter,
+    errors: &mut Vec<OwlParseError>,
+) -> anyhow::Result<Spanned<Name>> {
+    match lex.next() {
+        Some((Token::ID(name), sp)) => Ok((name, sp)),
+        Some(found) => {
+            errors.push(OwlParseError::UnexpectedToken {
+                expected: Some(Token::ID("".to_string())),
+                found: found.clone(),
+            });
+            Ok(("".to_string(), found.1))
+        }
+        None => Err(OwlParseError::EndOfInput.into()),
+    }
+}
+
+fn parse_args(
+    lex: &mut InputIter,
+    errors: &mut Vec<OwlParseError>,
+) -> anyhow::Result<Vec<Spanned<Name>>> {
+    todo!()
+}
+
+fn parse_value_declaration(
+    lex: &mut InputIter,
+    errors: &mut Vec<OwlParseError>,
+) -> anyhow::Result<Spanned<Declaration>> {
     let _ = expect_tok(Token::Let, lex, errors)?;
+    let name = parse_name(lex, errors)?;
+    let args = parse_args(lex, errors)?;
 
     todo!()
 }
 
-fn parse_type_declaration(lex: &mut InputIter, errors: &mut Vec<OwlParseError>) -> anyhow::Result<Spanned<Declaration>> {
-    todo!()
+fn parse_type_declaration(
+    lex: &mut InputIter,
+    errors: &mut Vec<OwlParseError>,
+) -> anyhow::Result<Spanned<Declaration>> {
+    let start = expect_tok(Token::Typ, lex, errors)?;
+    let name = parse_name(lex, errors)?;
+    let _ = expect_tok(Token::Is, lex, errors)?;
+    let (typ, typ_sp) = parse_type(lex, errors)?;
+
+    Ok((
+        Declaration::Type(name, (typ, typ_sp.clone())),
+        span_add(start, typ_sp),
+    ))
 }
 
-fn parse_expression(lex: &mut InputIter, errors: &mut Vec<OwlParseError>) -> anyhow::Result<Spanned<Expression>> {
+fn parse_type(
+    lex: &mut InputIter,
+    errors: &mut Vec<OwlParseError>,
+) -> anyhow::Result<Spanned<Type>> {
+    // parse a type
+    let left = match lex.next() {
+        Some((Token::Unit, sp)) => (Type::Unit, sp),
+        Some((Token::ID(id), sp)) if id == "Int" => (Type::Int, sp),
+        Some((Token::ID(id), sp)) if id == "Bool" => (Type::Int, sp),
+        Some((Token::ID(id), sp)) => (Type::Var(id), sp),
+        Some(found) => return Err(OwlParseError::InvalidType(found).into()),
+        None => return Err(OwlParseError::EndOfInput.into()),
+    };
+
+    // check for an arrow
+    if let Some((Token::Arrow, sp)) = lex.peek() {
+        // eat the arrow
+        lex.next();
+        // recur
+        let right = parse_type(lex, errors)?;
+
+        Ok((
+            Type::Arrow(Box::new(left.clone()), Box::new(right.clone())),
+            span_add(left.1, right.1),
+        ))
+    } else {
+        Ok(left)
+    }
+}
+
+fn parse_expression(
+    lex: &mut InputIter,
+    errors: &mut Vec<OwlParseError>,
+) -> anyhow::Result<Spanned<Expression>> {
     todo!()
 }

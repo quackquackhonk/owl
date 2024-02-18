@@ -8,6 +8,10 @@ pub mod parser;
 pub type Span = core::ops::Range<usize>;
 pub type Spanned<T> = (T, Span);
 
+pub fn span_add(start: Span, end: Span) -> Span {
+    start.start..end.end
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
