@@ -4,7 +4,7 @@ use logos::{Lexer, Logos, SpannedIter};
 
 use super::{
     ast::{Declaration, Expression, Name, Program, Type},
-    error::{OwlParseError, produce_error_report},
+    error::{Recoverable, produce_error_report, Unrecoverable},
     lexer::{lexer, Token},
     span_add, Span, Spanned,
 };
@@ -31,7 +31,7 @@ pub fn owl_program_parser(path: &str) -> anyhow::Result<Program> {
 
 }
 
-fn parse_program(lex: &mut InputIter) -> anyhow::Result<(Program, Vec<OwlParseError>)> {
+fn parse_program(lex: &mut InputIter) -> anyhow::Result<(Program, Vec<Recoverable>)> {
     let mut errors = vec![];
     let decls = parse_declarations(lex, &mut errors)?;
     let expr = parse_expression(lex, &mut errors)?;
@@ -45,19 +45,19 @@ fn parse_program(lex: &mut InputIter) -> anyhow::Result<(Program, Vec<OwlParseEr
 fn expect_tok(
     tok: Token,
     lex: &mut InputIter,
-    errors: &mut Vec<OwlParseError>,
+    errors: &mut Vec<Recoverable>,
 ) -> anyhow::Result<Span> {
     match lex.next() {
         Some((found, sp)) if found == tok => Ok(sp),
         Some(found) => {
-            errors.push(OwlParseError::UnexpectedToken {
+            errors.push(Recoverable::UnexpectedToken {
                 expected: Some(tok),
                 found: found.clone()
             });
 
             Ok(found.1)
         }
-        None => Err(OwlParseError::EndOfInput.into()),
+        None => Err(Unrecoverable::EndOfInput.into()),
     }
 }
 
@@ -66,7 +66,7 @@ fn expect_tok(
 /// * `lex`: the token iterator
 fn parse_declarations(
     lex: &mut InputIter,
-    errors: &mut Vec<OwlParseError>,
+    errors: &mut Vec<Recoverable>,
 ) -> anyhow::Result<Vec<Spanned<Declaration>>> {
     let mut errors = vec![];
     let mut decs: Vec<Spanned<Declaration>> = vec![];
@@ -91,11 +91,11 @@ fn parse_declarations(
                 let Some((Token::Error(bad), sp)) = lex.next() else {
                     unreachable!()
                 };
-                errors.push(OwlParseError::LexerError((bad, (sp.start..sp.end))))
+                errors.push(Recoverable::LexerError((bad, (sp.start..sp.end))))
             }
             Some((_, _)) => break,
             // early EOI is unrecoverable
-            None => return Err(OwlParseError::EndOfInput.into()),
+            None => return Err(Unrecoverable::EndOfInput.into()),
         };
     }
 
@@ -104,31 +104,31 @@ fn parse_declarations(
 
 fn parse_name(
     lex: &mut InputIter,
-    errors: &mut Vec<OwlParseError>,
+    errors: &mut Vec<Recoverable>,
 ) -> anyhow::Result<Spanned<Name>> {
     match lex.next() {
         Some((Token::ID(name), sp)) => Ok((name, sp)),
         Some(found) => {
-            errors.push(OwlParseError::UnexpectedToken {
+            errors.push(Recoverable::UnexpectedToken {
                 expected: Some(Token::ID("".to_string())),
                 found: found.clone(),
             });
             Ok(("".to_string(), found.1))
         }
-        None => Err(OwlParseError::EndOfInput.into()),
+        None => Err(Unrecoverable::EndOfInput.into()),
     }
 }
 
 fn parse_args(
     lex: &mut InputIter,
-    errors: &mut Vec<OwlParseError>,
+    errors: &mut Vec<Recoverable>,
 ) -> anyhow::Result<Vec<Spanned<Name>>> {
     todo!()
 }
 
 fn parse_value_declaration(
     lex: &mut InputIter,
-    errors: &mut Vec<OwlParseError>,
+    errors: &mut Vec<Recoverable>,
 ) -> anyhow::Result<Spanned<Declaration>> {
     let _ = expect_tok(Token::Let, lex, errors)?;
     let name = parse_name(lex, errors)?;
@@ -139,7 +139,7 @@ fn parse_value_declaration(
 
 fn parse_type_declaration(
     lex: &mut InputIter,
-    errors: &mut Vec<OwlParseError>,
+    errors: &mut Vec<Recoverable>,
 ) -> anyhow::Result<Spanned<Declaration>> {
     let start = expect_tok(Token::Typ, lex, errors)?;
     let name = parse_name(lex, errors)?;
@@ -154,7 +154,7 @@ fn parse_type_declaration(
 
 fn parse_type(
     lex: &mut InputIter,
-    errors: &mut Vec<OwlParseError>,
+    errors: &mut Vec<Recoverable>,
 ) -> anyhow::Result<Spanned<Type>> {
     // parse a type
     let left = match lex.next() {
@@ -162,8 +162,8 @@ fn parse_type(
         Some((Token::ID(id), sp)) if id == "Int" => (Type::Int, sp),
         Some((Token::ID(id), sp)) if id == "Bool" => (Type::Int, sp),
         Some((Token::ID(id), sp)) => (Type::Var(id), sp),
-        Some(found) => return Err(OwlParseError::InvalidType(found).into()),
-        None => return Err(OwlParseError::EndOfInput.into()),
+        Some(found) => return Err(Unrecoverable::InvalidType(found).into()),
+        None => return Err(Unrecoverable::EndOfInput.into()),
     };
 
     // check for an arrow
@@ -184,7 +184,7 @@ fn parse_type(
 
 fn parse_expression(
     lex: &mut InputIter,
-    errors: &mut Vec<OwlParseError>,
+    errors: &mut Vec<Recoverable>,
 ) -> anyhow::Result<Spanned<Expression>> {
     todo!()
 }
