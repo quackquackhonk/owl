@@ -168,12 +168,16 @@ fn parse_type_declaration(
 
 fn parse_type(lex: &mut InputIter, errors: &mut Vec<Recoverable>) -> anyhow::Result<Spanned<Type>> {
     // parse a type
-    // TODO: We need to account for parens
     let left = match lex.next() {
         Some((Token::Unit, sp)) => (Type::Unit, sp),
         Some((Token::ID(id), sp)) if id == "Int" => (Type::Int, sp),
         Some((Token::ID(id), sp)) if id == "Bool" => (Type::Int, sp),
         Some((Token::ID(id), sp)) => (Type::Var(id), sp),
+        Some((Token::LParen, _)) => {
+            let typ = parse_type(lex, errors)?;
+            let _ = expect_tok(Token::RParen, lex, errors)?;
+            typ
+        }
         Some(found) => return Err(Unrecoverable::InvalidType(found).into()),
         None => return Err(Unrecoverable::EndOfInput.into()),
     };
