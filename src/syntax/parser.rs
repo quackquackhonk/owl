@@ -203,5 +203,60 @@ fn parse_expression(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
 ) -> anyhow::Result<Spanned<Expression>> {
-    todo!()
+    // TODO: Unary operations
+    // TODO: Binary operations
+    // TODO: Function expressions
+    // TODO: Function calls
+    // TODO: Conditionals
+    // TODO: blocks
+    let left = match lex.next() {
+        // Atoms
+        Some((Token::Unit, sp)) => (Expression::Unit, sp),
+        Some((Token::Num(x), sp)) => {
+            let i: isize = x.parse()?;
+            (Expression::Int(i), sp)
+        },
+        Some((Token::Bool(b), sp)) => (Expression::Bool(b), sp),
+        // Function expression
+        Some((Token::At, sp)) => {
+            let args = parse_args(lex, errors)?;
+
+        }
+        Some(_) => todo!(),
+        None => return Err(Unrecoverable::EndOfInput.into())
+    };
+
+    Ok(left)
+}
+
+fn parse_atom(
+    lex: &mut InputIter,
+    errors: &mut Vec<Recoverable>,
+) -> anyhow::Result<Spanned<Expression>> {
+    match lex.peek() {
+        Some((Token::Unit, _)) => {
+            if let Some((_, sp)) = lex.next() {
+                Ok((Expression::Unit, sp))
+            } else {
+                unreachable!()
+            }
+        }
+        Some((Token::Num(_), _)) => {
+            if let Some((Token::Num(x), sp)) = lex.next() {
+                let x: isize = x.parse()?;
+                Ok((Expression::Int(x), sp))
+            } else {
+                unreachable!()
+            }
+        }
+        Some((Token::Bool(_), _)) => {
+            if let Some((Token::Bool(b), sp)) = lex.next() {
+                Ok((Expression::Bool(b), sp))
+            } else {
+                unreachable!()
+            }
+        }
+        Some(_) => todo!(),
+        None => Err(Unrecoverable::EndOfInput.into()),
+    }
 }

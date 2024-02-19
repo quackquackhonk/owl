@@ -70,6 +70,7 @@ pub enum Token {
 
     #[regex(r"[ \t\f\n]+", logos::skip)]
     Whitespace,
+    // TODO: multiline comments
     #[regex(r"#.*\n", logos::skip)]
     Comment,
     // error variant, only procu
