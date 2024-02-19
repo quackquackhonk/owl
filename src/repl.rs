@@ -13,7 +13,6 @@ pub fn owl_repl() -> anyhow::Result<()> {
     }
 
     loop {
-        // TODO: We should parse accept input until a complete statement
         let readline = rl.readline(">>> ");
         match readline {
             Ok(line) => {

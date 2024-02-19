@@ -1,10 +1,8 @@
 use std::{fs::File, io::Read, iter::Peekable};
 
-use logos::{Lexer, Logos, SpannedIter};
-
 use super::{
     ast::{Declaration, Expression, Name, Program, Type},
-    error::{Recoverable, produce_error_report, Unrecoverable},
+    error::{produce_error_report, Recoverable, Unrecoverable},
     lexer::{lexer, Token},
     span_add, Span, Spanned,
 };
@@ -28,7 +26,6 @@ pub fn owl_program_parser(path: &str) -> anyhow::Result<Program> {
     } else {
         Err(produce_error_report(errs).into())
     }
-
 }
 
 fn parse_program(lex: &mut InputIter) -> anyhow::Result<(Program, Vec<Recoverable>)> {
@@ -52,7 +49,7 @@ fn expect_tok(
         Some(found) => {
             errors.push(Recoverable::UnexpectedToken {
                 expected: Some(tok),
-                found: found.clone()
+                found: found.clone(),
             });
 
             Ok(found.1)
@@ -66,7 +63,7 @@ fn expect_tok(
 /// * `lex`: the token iterator
 fn parse_declarations(
     lex: &mut InputIter,
-    errors: &mut Vec<Recoverable>,
+    _errors: &mut Vec<Recoverable>,
 ) -> anyhow::Result<Vec<Spanned<Declaration>>> {
     let mut errors = vec![];
     let mut decs: Vec<Spanned<Declaration>> = vec![];
@@ -102,10 +99,7 @@ fn parse_declarations(
     Ok(decs)
 }
 
-fn parse_name(
-    lex: &mut InputIter,
-    errors: &mut Vec<Recoverable>,
-) -> anyhow::Result<Spanned<Name>> {
+fn parse_name(lex: &mut InputIter, errors: &mut Vec<Recoverable>) -> anyhow::Result<Spanned<Name>> {
     match lex.next() {
         Some((Token::ID(name), sp)) => Ok((name, sp)),
         Some(found) => {
@@ -121,20 +115,40 @@ fn parse_name(
 
 fn parse_args(
     lex: &mut InputIter,
-    errors: &mut Vec<Recoverable>,
+    _errors: &mut Vec<Recoverable>,
 ) -> anyhow::Result<Vec<Spanned<Name>>> {
-    todo!()
+    let mut names = vec![];
+
+    loop {
+        match lex.peek() {
+            Some((Token::ID(_), _)) => {
+                // eat and push the token
+                if let Some((Token::ID(name), sp)) = lex.next() {
+                    names.push((name, sp));
+                }
+            }
+            Some(_) => break,
+            None => return Err(Unrecoverable::EndOfInput.into()),
+        }
+    }
+
+    Ok(names)
 }
 
 fn parse_value_declaration(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
 ) -> anyhow::Result<Spanned<Declaration>> {
-    let _ = expect_tok(Token::Let, lex, errors)?;
+    let start = expect_tok(Token::Let, lex, errors)?;
     let name = parse_name(lex, errors)?;
     let args = parse_args(lex, errors)?;
+    let _ = expect_tok(Token::Be, lex, errors)?;
+    let (expr, end) = parse_expression(lex, errors)?;
 
-    todo!()
+    Ok((
+        Declaration::Value(name, args, (expr, end.clone())),
+        span_add(start, end),
+    ))
 }
 
 fn parse_type_declaration(
@@ -152,11 +166,9 @@ fn parse_type_declaration(
     ))
 }
 
-fn parse_type(
-    lex: &mut InputIter,
-    errors: &mut Vec<Recoverable>,
-) -> anyhow::Result<Spanned<Type>> {
+fn parse_type(lex: &mut InputIter, errors: &mut Vec<Recoverable>) -> anyhow::Result<Spanned<Type>> {
     // parse a type
+    // TODO: We need to account for parens
     let left = match lex.next() {
         Some((Token::Unit, sp)) => (Type::Unit, sp),
         Some((Token::ID(id), sp)) if id == "Int" => (Type::Int, sp),
@@ -167,10 +179,11 @@ fn parse_type(
     };
 
     // check for an arrow
-    if let Some((Token::Arrow, sp)) = lex.peek() {
+    if let Some((Token::Arrow, _)) = lex.peek() {
         // eat the arrow
         lex.next();
-        // recur
+
+        // do a recursive call to grab the next type
         let right = parse_type(lex, errors)?;
 
         Ok((
