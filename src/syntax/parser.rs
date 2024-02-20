@@ -1,7 +1,7 @@
 use std::{fs::File, io::Read, iter::Peekable};
 
 use super::{
-    ast::{Declaration, Expression, Name, Program, Type},
+    ast::{Declaration, Expression, Name, Program, Type, UnOp},
     error::{produce_error_report, Recoverable, Unrecoverable},
     lexer::{lexer, Token},
     span_add, Span, Spanned,
@@ -205,9 +205,7 @@ fn parse_expression(
 ) -> anyhow::Result<Spanned<Expression>> {
     // TODO: Unary operations
     // TODO: Binary operations
-    // TODO: Function expressions
     // TODO: Function calls
-    // TODO: Conditionals
     // TODO: blocks
     let left = match lex.next() {
         // Atoms
@@ -215,15 +213,60 @@ fn parse_expression(
         Some((Token::Num(x), sp)) => {
             let i: isize = x.parse()?;
             (Expression::Int(i), sp)
-        },
+        }
         Some((Token::Bool(b), sp)) => (Expression::Bool(b), sp),
+        Some((Token::ID(name), sp)) => (Expression::Var(name), sp),
         // Function expression
         Some((Token::At, sp)) => {
             let args = parse_args(lex, errors)?;
+            let _ = expect_tok(Token::BigArrow, lex, errors)?;
+            let (ex, ex_sp) = parse_expression(lex, errors)?;
+            (
+                Expression::Function(args, Box::new((ex, ex_sp.clone()))),
+                span_add(sp, ex_sp),
+            )
+        }
+        Some((Token::LParen, _)) => {
+            let ex = parse_expression(lex, errors)?;
+            let _ = expect_tok(Token::RParen, lex, errors)?;
+            ex
+        }
+        // Unary operations
+        Some((Token::Bang, start)) => {
+            // Boolean NOT
+            let (ex, ex_sp) = parse_expression(lex, errors)?;
+            (
+                Expression::UnaryOp(UnOp::Not, Box::new((ex, ex_sp.clone()))),
+                span_add(start, ex_sp),
+            )
+        }
+        Some((Token::Minus, start)) => {
+            // Negation
+            let (ex, ex_sp) = parse_expression(lex, errors)?;
+            (
+                Expression::UnaryOp(UnOp::Neg, Box::new((ex, ex_sp.clone()))),
+                span_add(start, ex_sp),
+            )
+        }
+        // Conditionals
+        Some((Token::If, start)) => {
+            let cond = parse_expression(lex, errors)?;
+            let _ = expect_tok(Token::Then, lex, errors)?;
+            let then = parse_expression(lex, errors)?;
+            let _ = expect_tok(Token::Else, lex, errors)?;
+            let (els, els_sp) = parse_expression(lex, errors)?;
 
+            (
+                Expression::Conditional(
+                    Box::new(cond),
+                    Box::new(then),
+                    Box::new((els, els_sp.clone())),
+                ),
+                span_add(start, els_sp),
+            )
         }
         Some(_) => todo!(),
-        None => return Err(Unrecoverable::EndOfInput.into())
+        None => return Err(Unrecoverable::EndOfInput.into()),
     };
 
     Ok(left)
