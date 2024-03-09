@@ -1,8 +1,0 @@
-let identifier be 10;
-# comment
-let something? be true;
-let identifier' be identifier;
-let a_long_word be 12345678900;
-let __dunder__ be something?;
-
-a_long_word
