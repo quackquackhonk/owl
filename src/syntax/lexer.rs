@@ -15,33 +15,32 @@ pub enum Token {
     // declarations
     #[token("let")]
     Let,
-    #[token("be")]
-    Be,
-    #[token("typ")]
-    Typ,
-    #[token("is")]
-    Is,
-    #[token("if")]
-    If,
-    #[token("then")]
-    Then,
-    #[token("else")]
-    Else,
-    // symbols
+    #[token("=")]
+    Assign,
+    #[token("fun")]
+    Fun,
     #[token("{")]
     LBrace,
     #[token("}")]
     RBrace,
+    // symbols
     #[token(";")]
     SemiColon,
-    #[token("@")]
-    At,
-    #[token("$")]
-    Dollar,
+    #[token(":")]
+    Colon,
+    #[token(",")]
+    Comma,
     #[token("->")]
     Arrow,
-    #[token("=>")]
-    BigArrow,
+    #[token("(")]
+    LParen,
+    #[token(")")]
+    RParen,
+    // TODO: Function expressions
+    // #[token("@")]
+    // At,
+    // #[token("=>")]
+    // BigArrow,
     // arith
     #[token("+")]
     Plus,
@@ -51,29 +50,32 @@ pub enum Token {
     Mult,
     #[token("/")]
     Divide,
-    #[token("(")]
-    LParen,
-    #[token(")")]
-    RParen,
     #[token("!")]
     Bang,
-    #[token("=")]
+    #[token("==")]
     Eq,
-    #[token("&")]
+    #[token("!=")]
+    Neq,
+    #[token("&&")]
     And,
-    #[token("|")]
+    #[token("||")]
     Or,
     #[token("<")]
     Lt,
+    #[token("<=")]
+    LtEq,
     #[token(">")]
     Gt,
+    #[token(">=")]
+    GtEq,
 
     #[regex(r"[ \t\f\n]+", logos::skip)]
     Whitespace,
-    // TODO: multiline comments
     #[regex(r"#.*\n", logos::skip)]
     Comment,
-    // error variant, only procu
+    #[regex(r"#\*.*\*#")]
+    MultilineComment,
+    // error variant, only produced by the entry point
     Error(String),
 }
 
@@ -89,10 +91,10 @@ pub fn lexer(source: &str) -> Vec<Spanned<Token>> {
     // NOTE: It would be really nice if I didn't have to collect the values manually
     while let Some(res) = lex.next() {
         match res.0 {
-            Ok(tok) => out.push((tok, res.1)),
+            Ok(tok) => out.push(Spanned::new(tok, res.1)),
             Err(_) => {
                 let bad = lex.slice().to_string();
-                out.push((Token::Error(bad), res.1))
+                out.push(Spanned::new(Token::Error(bad), res.1))
             }
         }
     }

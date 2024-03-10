@@ -1,0 +1,13 @@
+# This is a single line comment
+
+fun sum(a: int, b: int) -> int {
+    a + b
+}
+
+#* This is a multiline comment
+ * You can # nest comments as well
+ *#
+
+fun main() -> int {
+    sum(1, 5)
+}
