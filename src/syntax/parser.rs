@@ -1,7 +1,7 @@
 use std::{fs::File, io::Read, iter::Peekable};
 
 use super::{
-    ast::{Arg, BinOp, Expression, Ident, Program, Statement, Type},
+    ast::{Arg, BinOp, Declaration, Expression, Ident, Program, Statement, Type},
     error::{produce_error_report, Recoverable, Unrecoverable},
     lexer::{lexer, Token},
     span::{Span, Spanned},
@@ -31,17 +31,17 @@ pub fn owl_program_parser(path: &str) -> anyhow::Result<Program> {
 }
 
 fn parse_program(lex: &mut InputIter) -> ParseResult<(Program, Vec<Recoverable>)> {
-    let mut stmts: Vec<Spanned<Statement>> = vec![];
+    let mut decls: Vec<Spanned<Declaration>> = vec![];
     let mut errors: Vec<Recoverable> = vec![];
 
     loop {
-        match parse_statement(lex, &mut errors) {
-            Ok(stmt) => stmts.push(stmt),
-            Err(Unrecoverable::EndOfInput) => break,
+        match parse_declaration(lex, &mut errors) {
+            Ok(Some(decl)) => decls.push(decl),
+            Ok(None) => break,
             Err(err) => return Err(err),
         }
     }
-    Ok((Program::new(stmts), errors))
+    Ok((Program::new(decls), errors))
 }
 
 /// Attempts to parse the given token exactly.
@@ -106,10 +106,10 @@ fn parse_arg_list(
     }
 }
 
-fn parse_statement(
+fn parse_declaration(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
-) -> ParseResult<Spanned<Statement>> {
+) -> ParseResult<Option<Spanned<Declaration>>> {
     match lex.peek() {
         Some(Spanned(Token::Let, _)) => {
             let start = expect_tok(Token::Let, lex, errors)?;
@@ -117,7 +117,7 @@ fn parse_statement(
             let _ = expect_tok(Token::Assign, lex, errors)?;
             let rhs = parse_expr(lex, errors)?;
             let end = expect_tok(Token::SemiColon, lex, errors)?;
-            Ok(Spanned(Statement::Value(lhs, rhs), start + end))
+            Ok(Some(Spanned(Declaration::Value(lhs, rhs), start + end)))
         }
         Some(Spanned(Token::Fun, _)) => {
             let start = expect_tok(Token::Fun, lex, errors)?;
@@ -133,23 +133,34 @@ fn parse_statement(
                 None
             };
 
-            let _ = expect_tok(Token::LBrace, lex, errors)?;
-            let body = parse_body(lex, errors)?;
-            let end = expect_tok(Token::RBrace, lex, errors)?;
+            let body = match lex.peek() {
+                Some(Spanned(Token::Assign, _)) => {
+                    let _ = expect_tok(Token::Assign, lex, errors)?;
+                    parse_expr(lex, errors)?
+                }
+                Some(Spanned(Token::LBrace, _)) => parse_block(lex, errors)?,
+                Some(other) => {
+                    // TODO: This should also be Recoverable
+                    // we can assume the body is {} and then keep going
+                    return Err(Unrecoverable::ExpectedTokens(
+                        vec![Token::Assign, Token::LBrace],
+                        other.clone(),
+                    ));
+                }
+                None => return Err(Unrecoverable::EndOfInput),
+            };
 
-            Ok(Spanned(Statement::Function(id, args, ret_typ, body), start + end))
+            Ok(Some(Spanned(
+                Declaration::Function(id, args, ret_typ, body),
+                start + body.span(),
+            )))
         }
-        Some(other) => {
-            let expr = parse_expr(lex, errors)?;
-            let end = expect_tok(Token::SemiColon, lex, errors)?;
-            let sp = expr.span() + end;
-            Ok(Spanned(Statement::Expr(expr), sp))
-        }
+        Some(other) => Ok(None),
         None => return Err(Unrecoverable::EndOfInput),
     }
 }
 
-fn parse_body(
+fn parse_block(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
 ) -> ParseResult<Spanned<Expression>> {

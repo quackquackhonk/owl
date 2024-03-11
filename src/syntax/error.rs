@@ -27,6 +27,8 @@ pub enum Unrecoverable {
         kind: String,
         found: Spanned<Token>
     },
+    #[error("Expected: {0:?}\nFound: {1:?}")]
+    ExpectedTokens(Vec<Token>, Spanned<Token>),
     #[error("Finished parsing with errors!")]
     Finished(Vec<Recoverable>),
 }

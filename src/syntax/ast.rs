@@ -1,10 +1,10 @@
 use crate::syntax::span::Spanned;
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct Program(Vec<Spanned<Statement>>);
+pub struct Program(Vec<Spanned<Declaration>>);
 
 impl Program {
-    pub fn new(decls: Vec<Spanned<Statement>>) -> Self {
+    pub fn new(decls: Vec<Spanned<Declaration>>) -> Self {
         Program(decls)
     }
 }
@@ -32,13 +32,19 @@ pub enum Expression {
     BinaryOp(BinOp, Box<Spanned<Expression>>, Box<Spanned<Expression>>),
     UnaryOp(UnOp, Box<Spanned<Expression>>),
     FuncCall(Box<Spanned<Expression>>, Box<Spanned<Expression>>),
+    Block(Vec<Spanned<Statement>>, Box<Option<Spanned<Expression>>>)
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Declaration {
+    Value(Spanned<Arg>, Spanned<Expression>),
+    Function(Spanned<Ident>, Vec<Spanned<Arg>>, Option<Spanned<Type>>, Spanned<Expression>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Statement {
     Expr(Spanned<Expression>),
-    Value(Spanned<Arg>, Spanned<Expression>),
-    Function(Spanned<Ident>, Vec<Spanned<Arg>>, Option<Spanned<Type>>, Spanned<Expression>),
+    Decl(Spanned<Declaration>)
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
