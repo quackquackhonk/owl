@@ -4,7 +4,7 @@
     
 Comments are any line starting with `#`, or a pair of `#*` ... `*#`
 
-## Argument
+## Arguments
 
 Arguments are identifier with optional type information
 
@@ -14,31 +14,26 @@ Arguments are identifier with optional type information
     arglist ::= <arg>
         |   <arg>, <arglist>
 
-## Statements
+## Declarations
 
 Statements are either declarations, or expressions that end with a semicolon
 
     stmt ::= let <arg> = <expr>;
-        |   fun <ident>(<arglist>) {
-                (<stmt> | <expr>)+
-            }
-        |   fun <ident>(<arglist>) -> <type> {
-                (<stmt> | <expr>)+
-            }
-        |   <expr>;
+        | <expr>;
+        | fun <ident>(<arglist>) { <stmt>* }
+        | fun <ident>(<arglist>) -> <type> { <stmt>* }
 
 ## Types
 
     <type> ::= int | bool | unit
-        |   <type> -> <type>
+        | (<type>)
+        | <type> -> <type>
 
 ## Expressions
 
-    <atom> ::= <ident> 
+    <atom> ::= () | true | false
+        | <ident> 
         | <number> 
-        | true 
-        | false 
-        | () 
         | (<expr>)
 
     <expr> ::= <atom>

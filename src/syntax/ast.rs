@@ -1,18 +1,18 @@
-use super::Spanned;
+use crate::syntax::span::Spanned;
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct Program(Vec<Spanned<Declaration>>);
+pub struct Program(Vec<Spanned<Statement>>);
 
 impl Program {
-    pub fn new(decls: Vec<Spanned<Declaration>>) -> Self {
+    pub fn new(decls: Vec<Spanned<Statement>>) -> Self {
         Program(decls)
     }
 }
 
 pub type Ident = String;
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct Arg(Spanned<Ident>, Spanned<Type>);
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Arg(pub Spanned<Ident>, pub Option<Spanned<Type>>);
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Type {
@@ -21,12 +21,6 @@ pub enum Type {
     Bool,
     Var(Ident),
     Arrow(Box<Spanned<Type>>, Box<Spanned<Type>>),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Declaration {
-    Value(Spanned<Ident>, Spanned<Expression>),
-    Function(Spanned<Ident>, Vec<Spanned<Ident>>, Spanned<Expression>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -42,8 +36,9 @@ pub enum Expression {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Statement {
-    Expr(Expression),
-    Decl(Declaration),
+    Expr(Spanned<Expression>),
+    Value(Spanned<Arg>, Spanned<Expression>),
+    Function(Spanned<Ident>, Vec<Spanned<Arg>>, Option<Spanned<Type>>, Spanned<Expression>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

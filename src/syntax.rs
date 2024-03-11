@@ -1,27 +1,10 @@
 //! This module contains utilities for dealing with the syntax of the Owl language.
 
+pub mod span;
 pub mod ast;
 pub mod error;
 pub mod lexer;
 pub mod parser;
-
-pub type Span = core::ops::Range<usize>;
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Spanned<T> {
-    val: T,
-    span: Span
-}
-
-impl<T> Spanned<T> {
-    pub fn new(val: T, span: Span) -> Self {
-        Self { val, span }
-    }
-    pub fn extend(self, sp: Span) -> Self {
-        Spanned::new(self.val, self.span.start..sp.end)
-    }
-}
-
 
 #[cfg(test)]
 mod tests {

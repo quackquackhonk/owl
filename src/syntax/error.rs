@@ -1,6 +1,7 @@
 use thiserror::Error;
 
-use super::{lexer::Token, Spanned};
+use super::lexer::Token;
+use crate::syntax::span::Spanned;
 
 // use ariadne::{Color, Label, Report, ReportKind, Source};
 
@@ -8,11 +9,11 @@ use super::{lexer::Token, Spanned};
 pub enum Recoverable {
     #[error("Invalid tokens found: {0:?}")]
     LexerError(Spanned<String>),
-    #[error("Unexpected token found!")]
+    #[error("Unexpected token! expected {expected:?}, found {found:?}")]
     UnexpectedToken {
-        expected: Option<Token>,
+        expected: Token,
         found: Spanned<Token>,
-    }
+    },
 }
 
 #[derive(Debug, Error)]
@@ -21,6 +22,11 @@ pub enum Unrecoverable {
     EndOfInput,
     #[error("Found a bad token when looking for a type: {0:?}")]
     InvalidType(Spanned<Token>),
+    #[error("Expected a(n) {kind}, found: {found:?}")]
+    ExpectedKind {
+        kind: String,
+        found: Spanned<Token>
+    },
     #[error("Finished parsing with errors!")]
     Finished(Vec<Recoverable>),
 }

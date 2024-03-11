@@ -1,13 +1,13 @@
 use logos::Logos;
 
-use super::Spanned;
+use crate::syntax::span::Spanned;
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Token {
     #[regex(r"[a-zA-Z_][a-zA-Z?'_]*", |lex| lex.slice().to_string())]
     ID(String),
-    #[regex(r"[-]?[0-9]+", |lex| lex.slice().to_string())]
-    Num(String),
+    #[regex(r"[-]?[0-9]+", |lex| lex.slice().to_string().parse::<isize>().unwrap())]
+    Num(isize),
     #[regex("true|false", |lex| if lex.slice() == "true" { true } else { false })]
     Bool(bool),
     #[token("()")]
@@ -91,10 +91,10 @@ pub fn lexer(source: &str) -> Vec<Spanned<Token>> {
     // NOTE: It would be really nice if I didn't have to collect the values manually
     while let Some(res) = lex.next() {
         match res.0 {
-            Ok(tok) => out.push(Spanned::new(tok, res.1)),
+            Ok(tok) => out.push(Spanned::new(tok, res.1.into())),
             Err(_) => {
                 let bad = lex.slice().to_string();
-                out.push(Spanned::new(Token::Error(bad), res.1))
+                out.push(Spanned::new(Token::Error(bad), res.1.into()))
             }
         }
     }
