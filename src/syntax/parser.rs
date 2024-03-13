@@ -2,7 +2,7 @@ use std::{fs::File, io::Read, iter::Peekable};
 
 use super::{
     ast::{Arg, BinOp, Declaration, Expression, Ident, Program, Statement, Type},
-    error::{produce_error_report, Recoverable, Unrecoverable},
+    error::{Recoverable, Unrecoverable},
     lexer::{lexer, Token},
     span::{Span, Spanned},
 };
@@ -19,14 +19,19 @@ pub fn owl_program_parser(path: &str) -> anyhow::Result<Program> {
     let mut source = String::new();
     file.read_to_string(&mut source)?;
 
-    let mut lex = lexer(&source).into_iter().peekable();
+    let mut lex = dbg!(lexer(&source)).into_iter().peekable();
 
-    let (prog, errs) = parse_program(&mut lex)?;
-
-    if errs.is_empty() {
-        Ok(prog)
-    } else {
-        Err(produce_error_report(errs).into())
+    match parse_program(&mut lex) {
+        Ok((prog, errs)) if errs.is_empty() => Ok(prog),
+        Ok((_, errs)) => {
+            let u = Unrecoverable::Finished(errs);
+            let _ = u.report(path, &source)?;
+            Err(u.into())
+        }
+        Err(u) => {
+            let _ = u.report(path, &source)?;
+            Err(u.into())
+        }
     }
 }
 
@@ -122,15 +127,24 @@ fn parse_declaration(
         Some(Spanned(Token::Fun, _)) => {
             let start = expect_tok(Token::Fun, lex, errors)?;
             let id = parse_ident(lex, errors)?;
-            let _ = expect_tok(Token::LParen, lex, errors)?;
-            let args = parse_arg_list(lex, errors)?;
-            let _ = expect_tok(Token::RParen, lex, errors)?;
 
-            let ret_typ = if let Some(Spanned(Token::Arrow, sp)) = lex.peek() {
-                lex.next();
-                Some(parse_type(lex, errors)?)
+            let _ = expect_tok(Token::LParen, lex, errors)?;
+            // check for immediate close
+            let args = if let Some(Spanned(Token::RParen, _)) = lex.peek() {
+                let _ = expect_tok(Token::RParen, lex, errors)?;
+                vec![]
             } else {
-                None
+                let args = parse_arg_list(lex, errors)?;
+                let _ = expect_tok(Token::RParen, lex, errors)?;
+                args
+            };
+
+            let ret_typ = match lex.peek() {
+                Some(Spanned(Token::Arrow, _)) => {
+                    let _ = expect_tok(Token::Arrow, lex, errors)?;
+                    Some(parse_type(lex, errors)?)
+                }
+                _ => None,
             };
 
             let body = match lex.peek() {
@@ -150,13 +164,13 @@ fn parse_declaration(
                 None => return Err(Unrecoverable::EndOfInput),
             };
 
+            let sp = start + body.span();
             Ok(Some(Spanned(
                 Declaration::Function(id, args, ret_typ, body),
-                start + body.span(),
+                sp,
             )))
         }
-        Some(other) => Ok(None),
-        None => return Err(Unrecoverable::EndOfInput),
+        Some(_) | None => Ok(None),
     }
 }
 
@@ -164,7 +178,49 @@ fn parse_block(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
 ) -> ParseResult<Spanned<Expression>> {
-    todo!()
+    let mut stmts = vec![];
+    let start = expect_tok(Token::LBrace, lex, errors)?;
+
+    let expr = loop {
+        match lex.peek() {
+            // check if its a declaration
+            Some(Spanned(Token::Let, _)) | Some(Spanned(Token::Fun, _)) => {
+                match parse_declaration(lex, errors)? {
+                    Some(decl) => stmts.push(Statement::Decl(decl)),
+                    None => continue,
+                }
+            }
+            // check if the block is ending
+            Some(Spanned(Token::RBrace, _)) => break None,
+            // If anything else, parse an expression
+            Some(Spanned(_, _)) => {
+                let e = parse_expr(lex, errors)?;
+                // Check if this is an expr or a statement
+                match lex.peek() {
+                    Some(Spanned(Token::SemiColon, _)) => {
+                        // statement
+                        stmts.push(Statement::Expr(e));
+                    }
+                    Some(Spanned(Token::RBrace, _)) => {
+                        // expressions
+                        break Some(Box::new(e));
+                    }
+                    Some(other) => {
+                        return Err(Unrecoverable::ExpectedTokens(
+                            vec![Token::SemiColon, Token::RBrace],
+                            other.clone(),
+                        ))
+                    }
+                    None => return Err(Unrecoverable::EndOfInput),
+                }
+            }
+            None => return Err(Unrecoverable::EndOfInput),
+        };
+    };
+
+    let end = expect_tok(Token::RBrace, lex, errors)?;
+
+    Ok(Spanned(Expression::Block(stmts, expr), start + end))
 }
 
 fn parse_type(lex: &mut InputIter, errors: &mut Vec<Recoverable>) -> ParseResult<Spanned<Type>> {
@@ -172,12 +228,12 @@ fn parse_type(lex: &mut InputIter, errors: &mut Vec<Recoverable>) -> ParseResult
         Some(Spanned(Token::ID(x), span)) if x == "int" => Spanned::new(Type::Int, span),
         Some(Spanned(Token::ID(x), span)) if x == "bool" => Spanned::new(Type::Bool, span),
         Some(Spanned(Token::ID(x), span)) if x == "unit" => Spanned::new(Type::Unit, span),
-        Some(Spanned(Token::LParen, span)) => {
+        Some(Spanned(Token::LParen, _)) => {
             let ty = parse_type(lex, errors)?;
             let _ = expect_tok(Token::RParen, lex, errors)?;
             ty
         }
-        Some(found) => return Err(Unrecoverable::InvalidType(found)),
+        Some(found) => return Err(Unrecoverable::ExpectedKind("type".to_string(), found)),
         None => return Err(Unrecoverable::EndOfInput),
     };
 
@@ -195,24 +251,44 @@ fn parse_atom(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
 ) -> ParseResult<Spanned<Expression>> {
-    match lex.next() {
-        Some(Spanned(Token::Unit, span)) => Ok(Spanned::new(Expression::Unit, span)),
+    let at = match lex.next() {
         Some(Spanned(Token::Bool(b), span)) => Ok(Spanned::new(Expression::Bool(b), span)),
         Some(Spanned(Token::Num(n), span)) => Ok(Spanned::new(Expression::Int(n), span)),
         Some(Spanned(Token::ID(id), span)) => Ok(Spanned::new(Expression::Var(id), span)),
-        Some(Spanned(Token::LParen, _)) => {
-            let expr = parse_expr(lex, errors)?;
-            let _ = expect_tok(Token::RParen, lex, errors)?;
+        Some(Spanned(Token::LParen, st)) => {
+            if let Some(Spanned(Token::RParen, _)) = lex.peek() {
+                let en = expect_tok(Token::RParen, lex, errors)?;
+                Ok(Spanned::new(Expression::Unit, st + en))
+            } else {
+                let expr = parse_expr(lex, errors)?;
+                let _ = expect_tok(Token::RParen, lex, errors)?;
+                Ok(expr)
+            }
+        }
+        Some(Spanned(Token::LBrace, _)) => {
+            let expr = parse_block(lex, errors)?;
+            let _ = expect_tok(Token::RBrace, lex, errors)?;
             Ok(expr)
         }
         Some(found) => {
             // this is probably Recoverable, but its a later problem ngl
-            Err(Unrecoverable::ExpectedKind {
-                kind: String::from("atom"),
-                found,
-            })
+            Err(Unrecoverable::ExpectedKind(String::from("atom"), found))
         }
         None => Err(Unrecoverable::EndOfInput),
+    }?;
+
+    // peek for parens
+    if let Some(Spanned(Token::LParen, _)) = lex.peek() {
+        let _ = expect_tok(Token::LParen, lex, errors)?;
+        let exprs = parse_expr_list(lex, errors)?;
+        let end = expect_tok(Token::RParen, lex, errors)?;
+        let sp = at.span() + end;
+        Ok(Spanned(
+            Expression::FuncCall(Box::new(at), Box::new(exprs)),
+            sp,
+        ))
+    } else {
+        Ok(at)
     }
 }
 
@@ -223,16 +299,6 @@ fn parse_expr(
     let at = parse_atom(lex, errors)?;
 
     match lex.peek() {
-        Some(Spanned(Token::LParen, _)) => {
-            let _ = lex.next();
-            let exprs = parse_expr_list(lex, errors)?;
-            let end = expect_tok(Token::RParen, lex, errors)?;
-            let sp = at.span() + end;
-            Ok(Spanned(
-                Expression::FuncCall(Box::new(at), Box::new(exprs)),
-                sp,
-            ))
-        }
         // Mult and Div have high precedence
         Some(Spanned(Token::Mult, _)) => parse_op_rhs(at, BinOp::Mul, lex, errors),
         Some(Spanned(Token::Divide, _)) => parse_op_rhs(at, BinOp::Div, lex, errors),

@@ -27,7 +27,7 @@ mod tests {
         file.read_to_string(&mut source)?;
         assert!(lexer::Token::lexer(&source)
             .spanned()
-            .all(|(tok, _)| { dbg!(tok).is_ok() }));
+            .all(|(tok, _)| { tok.is_ok() }));
 
         Ok(())
     }

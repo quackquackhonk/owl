@@ -13,7 +13,6 @@ fun main() -> bool {
     # int -> int
     let add6 = add1_sum3(2, 3);
 
-    10 == sum 4
-
+    10 == add6(4)
 }
 

@@ -1,17 +1,17 @@
+use std::fmt::Display;
+
 use logos::Logos;
 
 use crate::syntax::span::Spanned;
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Token {
-    #[regex(r"[a-zA-Z_][a-zA-Z?'_]*", |lex| lex.slice().to_string())]
+    #[regex(r"[a-zA-Z_][a-zA-Z0-9?'_]*", |lex| lex.slice().to_string())]
     ID(String),
     #[regex(r"[-]?[0-9]+", |lex| lex.slice().to_string().parse::<isize>().unwrap())]
     Num(isize),
     #[regex("true|false", |lex| if lex.slice() == "true" { true } else { false })]
     Bool(bool),
-    #[token("()")]
-    Unit,
     // declarations
     #[token("let")]
     Let,
@@ -77,6 +77,46 @@ pub enum Token {
     MultilineComment,
     // error variant, only produced by the entry point
     Error(String),
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Token::ID(st) => st.to_string(),
+            Token::Num(n) => n.to_string(),
+            Token::Bool(b) => b.to_string(),
+            Token::Let => "let".to_string(),
+            Token::Assign => "=".to_string(),
+            Token::Fun => "fun".to_string(),
+            Token::LBrace => "{".to_string(),
+            Token::RBrace => "}".to_string(),
+            Token::SemiColon => ";".to_string(),
+            Token::Colon => ":".to_string(),
+            Token::Comma => ",".to_string(),
+            Token::Arrow => "->".to_string(),
+            Token::LParen => "(".to_string(),
+            Token::RParen => ")".to_string(),
+            Token::Plus => "+".to_string(),
+            Token::Minus => "-".to_string(),
+            Token::Mult => "*".to_string(),
+            Token::Divide => "/".to_string(),
+            Token::Bang => "!".to_string(),
+            Token::Eq => "==".to_string(),
+            Token::Neq => "!=".to_string(),
+            Token::And => "&&".to_string(),
+            Token::Or => "||".to_string(),
+            Token::Lt => "<".to_string(),
+            Token::LtEq => "<=".to_string(),
+            Token::Gt => ">".to_string(),
+            Token::GtEq => ">=".to_string(),
+            Token::Whitespace => "whitespace".to_string(),
+            Token::Comment => "comment".to_string(),
+            Token::MultilineComment => "multiline comment".to_string(),
+            Token::Error(s) => s.to_string(),
+        };
+
+        write!(f, "{}", s)
+    }
 }
 
 /// Entry point for the lexer.

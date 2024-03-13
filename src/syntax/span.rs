@@ -1,9 +1,10 @@
-use std::{iter::Map, ops::Add};
+use std::ops::{Add, Range};
+
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Span {
-    start: usize,
-    end: usize,
+    pub start: usize,
+    pub end: usize,
 }
 
 impl Span {
@@ -18,6 +19,12 @@ impl From<std::ops::Range<usize>> for Span {
     }
 }
 
+impl From<Span> for Range<usize> {
+    fn from(value: Span) -> Self {
+        value.start..value.end
+    }
+}
+
 impl Add for Span {
     type Output = Self;
 
@@ -29,13 +36,13 @@ impl Add for Span {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Spanned<T>(pub T, pub Span);
 
-impl<T> Spanned<T> {
+impl<T: Clone> Spanned<T> {
     pub fn new(val: T, span: Span) -> Self {
         Self(val, span)
     }
 
-    pub fn val(self) -> T {
-        self.0
+    pub fn val(&self) -> T {
+        self.0.clone()
     }
 
     pub fn span(&self) -> Span {
@@ -46,7 +53,7 @@ impl<T> Spanned<T> {
         Spanned::new(self.0, self.1 + sp)
     }
 
-    pub fn map<F, U>(self, f: F) -> Spanned<U>
+    pub fn map<F, U: Clone>(self, f: F) -> Spanned<U>
     where
         F: Fn(T) -> U,
     {

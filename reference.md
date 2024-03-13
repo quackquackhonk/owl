@@ -40,11 +40,11 @@ Statements are either declarations, or expressions that end with a semicolon
         | <ident> 
         | <number> 
         | (<expr>)
+        | { <block> }
+        | <atom>(<exprlist>)
 
     <expr> ::= <atom>
         | <atom> <op> <expr>
-        | <atom>(<exprlist>)
-        | { <block> }
 
     <exprlist> ::= <expr> 
         | <expr>, <exprlist>

@@ -31,8 +31,8 @@ pub enum Expression {
     Var(Ident),
     BinaryOp(BinOp, Box<Spanned<Expression>>, Box<Spanned<Expression>>),
     UnaryOp(UnOp, Box<Spanned<Expression>>),
-    FuncCall(Box<Spanned<Expression>>, Box<Spanned<Expression>>),
-    Block(Vec<Spanned<Statement>>, Box<Option<Spanned<Expression>>>)
+    FuncCall(Box<Spanned<Expression>>, Box<Vec<Spanned<Expression>>>),
+    Block(Vec<Statement>, Option<Box<Spanned<Expression>>>)
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
