@@ -1,7 +1,10 @@
-use logos::Logos;
 use rustyline::{error::ReadlineError, DefaultEditor};
 
-use crate::syntax::{lexer::Token, ast::Statement};
+use crate::syntax::{
+    ast,
+    lexer::lexer,
+    parser::owl_repl_parser, pretty::pretty_repl_stmt,
+};
 
 pub fn owl_repl() -> anyhow::Result<()> {
     let mut rl = DefaultEditor::new()?;
@@ -38,12 +41,14 @@ pub fn owl_repl() -> anyhow::Result<()> {
 }
 
 fn process_line(line: String) -> anyhow::Result<()> {
-    let len = line.len();
+    let mut lex = lexer(&line).into_iter().peekable();
 
-    let lexer = Token::lexer(&line);
+    let stmt = owl_repl_parser(&mut lex);
 
-    let stmt: Statement = todo!();
+    match stmt {
+        Ok(stmt) =>println!("{}", pretty_repl_stmt(&stmt)),
+        Err(e) => println!("{}", e),
+    };
 
-    println!("{:?}", stmt);
     Ok(())
 }

@@ -1,7 +1,7 @@
 use std::{fs::File, io::Read, iter::Peekable};
 
 use super::{
-    ast::{Arg, BinOp, Declaration, Expression, Ident, Program, Statement, Type},
+    ast::{Arg, BinOp, Declaration, Expression, Ident, Program, ReplStatement, Statement, Type},
     error::{Recoverable, Unrecoverable},
     lexer::{lexer, Token},
     span::{Span, Spanned},
@@ -32,6 +32,31 @@ pub fn owl_program_parser(path: &str) -> anyhow::Result<Program> {
             let _ = u.report(path, &source)?;
             Err(u.into())
         }
+    }
+}
+
+pub fn owl_repl_parser(lex: &mut InputIter) -> ParseResult<ReplStatement> {
+    let mut errors: Vec<Recoverable> = vec![];
+    match lex.peek() {
+        Some(Spanned(Token::Let, _)) | Some(Spanned(Token::Fun, _)) => {
+            if let Some(d) = parse_declaration(lex, &mut errors)? {
+                let sp = d.span();
+                Ok(ReplStatement::Stmt(Spanned::new(Statement::Decl(d), sp)))
+            } else {
+                todo!()
+            }
+        }
+        Some(_) => {
+            let e = parse_expr(lex, &mut errors)?;
+            let sp = e.span();
+            if let Some(Spanned(Token::SemiColon, _)) = lex.peek() {
+                Ok(ReplStatement::Stmt(Spanned::new(Statement::Expr(e), sp)))
+            } else {
+                Ok(ReplStatement::Expr(e))
+            }
+
+        }
+        None => Err(Unrecoverable::EndOfInput)
     }
 }
 
@@ -251,6 +276,7 @@ fn parse_atom(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
 ) -> ParseResult<Spanned<Expression>> {
+    dbg!("atom");
     let at = match lex.next() {
         Some(Spanned(Token::Bool(b), span)) => Ok(Spanned::new(Expression::Bool(b), span)),
         Some(Spanned(Token::Num(n), span)) => Ok(Spanned::new(Expression::Int(n), span)),
@@ -315,8 +341,7 @@ fn parse_expr(
         // Bool ops have the same precedence
         Some(Spanned(Token::And, _)) => parse_op_rhs(at, BinOp::And, lex, errors),
         Some(Spanned(Token::Or, _)) => parse_op_rhs(at, BinOp::Or, lex, errors),
-        Some(_) => Ok(at),
-        None => return Err(Unrecoverable::EndOfInput),
+        Some(_) | None => Ok(at)
     }
 }
 

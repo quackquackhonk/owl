@@ -2,6 +2,7 @@
 
 pub mod span;
 pub mod ast;
+pub mod pretty;
 pub mod error;
 pub mod lexer;
 pub mod parser;

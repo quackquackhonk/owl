@@ -1,7 +1,9 @@
+use std::fmt::Display;
+
 use crate::syntax::span::Spanned;
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct Program(Vec<Spanned<Declaration>>);
+pub struct Program(pub Vec<Spanned<Declaration>>);
 
 impl Program {
     pub fn new(decls: Vec<Spanned<Declaration>>) -> Self {
@@ -30,7 +32,7 @@ pub enum Expression {
     Bool(bool),
     Var(Ident),
     BinaryOp(BinOp, Box<Spanned<Expression>>, Box<Spanned<Expression>>),
-    UnaryOp(UnOp, Box<Spanned<Expression>>),
+    // UnaryOp(UnOp, Box<Spanned<Expression>>),
     FuncCall(Box<Spanned<Expression>>, Box<Vec<Spanned<Expression>>>),
     Block(Vec<Statement>, Option<Box<Spanned<Expression>>>)
 }
@@ -45,6 +47,12 @@ pub enum Declaration {
 pub enum Statement {
     Expr(Spanned<Expression>),
     Decl(Spanned<Declaration>)
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum ReplStatement {
+    Stmt(Spanned<Statement>),
+    Expr(Spanned<Expression>)
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -63,11 +71,28 @@ pub enum BinOp {
     Or,
 }
 
+impl Display for BinOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            BinOp::Add => String::from("+"),
+            BinOp::Sub => String::from("-"),
+            BinOp::Mul => String::from("*"),
+            BinOp::Div => String::from("/"),
+            BinOp::Eq => String::from("=="),
+            BinOp::Neq => String::from("!="),
+            BinOp::Lt => String::from("<"),
+            BinOp::LtEq => String::from("<="),
+            BinOp::Gt => String::from(">"),
+            BinOp::GtEq => String::from(">="),
+            BinOp::And => String::from("&&"),
+            BinOp::Or => String::from("||"),
+        })
+    }
+}
+
 // TODO: add unary operations
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum UnOp {
     Neg,
     Not,
 }
-
-// TODO: Add pretty-printing

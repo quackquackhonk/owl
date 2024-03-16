@@ -1,8 +1,6 @@
-
-
 use clap::Parser;
-use owl::syntax::parser::owl_program_parser;
 use owl::repl;
+use owl::syntax::parser::owl_program_parser;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
