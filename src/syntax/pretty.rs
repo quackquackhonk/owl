@@ -128,7 +128,7 @@ pub fn pretty_expr(expr: &ast::Expression, ind: usize) -> String {
         ),
     };
 
-    format!("{}(expr {})", indent(ind), str)
+    format!("{}{}", indent(ind), str)
 }
 
 pub fn pretty_stmt(stmt: &ast::Statement, ind: usize) -> String {
