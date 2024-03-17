@@ -1,7 +1,7 @@
 use super::{ast, span::Spanned};
 
 pub fn indent(indent: usize) -> String {
-    String::from("\t").repeat(indent)
+    String::from("    ").repeat(indent)
 }
 
 pub fn pretty_prog(prog: &ast::Program, ind: usize) -> String {
@@ -49,15 +49,15 @@ pub fn pretty_decl(decl: &ast::Declaration, ind: usize) -> String {
             );
             let args_str = args
                 .iter()
-                .map(|Spanned(a, _)| pretty_arg(a, ind + 1))
+                .map(|Spanned(a, _)| pretty_arg(a, 0))
                 .collect::<Vec<String>>()
-                .join("\n");
+                .join(", ");
+            let args_str = format!("{}[{}]", indent(ind + 1), args_str);
             let expr_str = pretty_expr(&expr.val(), ind + 1);
             format!(
-                "{}(function {} \n{}[{}]\n{})",
+                "{}(function {} \n{}\n{})",
                 indent(ind),
                 id_str,
-                indent(ind + 1),
                 args_str,
                 expr_str
             )

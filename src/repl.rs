@@ -1,10 +1,6 @@
 use rustyline::{error::ReadlineError, DefaultEditor};
 
-use crate::syntax::{
-    ast,
-    lexer::lexer,
-    parser::owl_repl_parser, pretty::pretty_repl_stmt,
-};
+use crate::syntax::{lexer::lexer, parser::owl_repl_parser, pretty::pretty_repl_stmt};
 
 pub fn owl_repl() -> anyhow::Result<()> {
     let mut rl = DefaultEditor::new()?;
@@ -27,7 +23,6 @@ pub fn owl_repl() -> anyhow::Result<()> {
                 continue;
             }
             Err(ReadlineError::Eof) => {
-                println!("Got EOF, exiting...");
                 break;
             }
             Err(err) => {
@@ -46,7 +41,7 @@ fn process_line(line: String) -> anyhow::Result<()> {
     let stmt = owl_repl_parser(&mut lex);
 
     match stmt {
-        Ok(stmt) =>println!("{}", pretty_repl_stmt(&stmt)),
+        Ok(stmt) => println!("{}", pretty_repl_stmt(&stmt)),
         Err(e) => println!("{}", e),
     };
 

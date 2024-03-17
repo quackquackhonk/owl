@@ -276,7 +276,6 @@ fn parse_atom(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
 ) -> ParseResult<Spanned<Expression>> {
-    dbg!("atom");
     let at = match lex.next() {
         Some(Spanned(Token::Bool(b), span)) => Ok(Spanned::new(Expression::Bool(b), span)),
         Some(Spanned(Token::Num(n), span)) => Ok(Spanned::new(Expression::Int(n), span)),
