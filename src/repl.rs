@@ -14,12 +14,20 @@ pub fn owl_repl() -> anyhow::Result<()> {
     loop {
         let readline = rl.readline(">>> ");
         match readline {
-            Ok(line) => {
+            Ok(mut line) => {
+                'more: loop {
+                    match all_braces_closed(&line) {
+                        BracesClosed::Underclosed => match rl.readline("... ") {
+                            Ok(next) => line = line + "\n" + &next,
+                            Err(_) => break 'more,
+                        },
+                        _ => break 'more,
+                    };
+                }
                 rl.add_history_entry(line.as_str())?;
-                process_line(line)?
+                process_line(line.clone())?
             }
             Err(ReadlineError::Interrupted) => {
-                println!("Interrupted!");
                 continue;
             }
             Err(ReadlineError::Eof) => {
@@ -35,6 +43,22 @@ pub fn owl_repl() -> anyhow::Result<()> {
     Ok(())
 }
 
+enum BracesClosed {
+    Underclosed,
+    AllClosed,
+    Overclosed,
+}
+
+fn all_braces_closed(line: &String) -> BracesClosed {
+    let open = line.chars().filter(|c| *c != '{').count();
+    let close = line.chars().filter(|c| *c != '}').count();
+    match open.cmp(&close) {
+        std::cmp::Ordering::Less => BracesClosed::Underclosed,
+        std::cmp::Ordering::Equal => BracesClosed::AllClosed,
+        std::cmp::Ordering::Greater => BracesClosed::Overclosed,
+    }
+}
+
 fn process_line(line: String) -> anyhow::Result<()> {
     let mut lex = lexer(&line).into_iter().peekable();
 
@@ -42,7 +66,7 @@ fn process_line(line: String) -> anyhow::Result<()> {
 
     match stmt {
         Ok(stmt) => println!("{}", pretty_repl_stmt(&stmt)),
-        Err(e) => println!("{}", e),
+        Err(e) => e.report("REPL", &line)?,
     };
 
     Ok(())

@@ -175,7 +175,9 @@ fn parse_declaration(
             let body = match lex.peek() {
                 Some(Spanned(Token::Assign, _)) => {
                     let _ = expect_tok(Token::Assign, lex, errors)?;
-                    parse_expr(lex, errors)?
+                    let e = parse_expr(lex, errors)?;
+                    let _ = expect_tok(Token::SemiColon, lex, errors)?;
+                    e
                 }
                 Some(Spanned(Token::LBrace, _)) => parse_block(lex, errors)?,
                 Some(other) => {
@@ -224,6 +226,7 @@ fn parse_block(
                 match lex.peek() {
                     Some(Spanned(Token::SemiColon, _)) => {
                         // statement
+                        let _ = expect_tok(Token::SemiColon, lex, errors)?;
                         stmts.push(Statement::Expr(e));
                     }
                     Some(Spanned(Token::RBrace, _)) => {
