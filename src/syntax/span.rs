@@ -1,4 +1,4 @@
-use std::ops::{Add, Range};
+use std::ops::{Add, Range, Deref};
 
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -58,5 +58,13 @@ impl<T: Clone> Spanned<T> {
         F: Fn(T) -> U,
     {
         Spanned::new(f(self.0), self.1)
+    }
+}
+
+impl<T> Deref for Spanned<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

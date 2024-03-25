@@ -1,0 +1,20 @@
+<!-- Taken from https://github.com/mdn/webassembly-examples/blob/main/understanding-text-format/add.html -->
+<!doctype html>
+
+<html>
+
+  <head>
+    <meta charset="utf-8">
+    <title>Simple add example</title>
+  </head>
+
+  <body>
+    <script>
+      WebAssembly.instantiateStreaming(fetch("add.wasm"))
+      .then(obj => {
+        console.log(obj.instance.exports.add(1, 2));  // "3"
+      });
+    </script>
+  </body>
+
+</html>

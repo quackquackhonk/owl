@@ -46,15 +46,8 @@ pub fn pretty_decl(decl: &ast::Declaration, ind: usize) -> String {
                 pretty_expr(val, ind + 1)
             )
         }
-        ast::Declaration::Function(id, args, ret, expr) => {
-            let id_str = format!(
-                "{}{}",
-                id.val(),
-                match ret {
-                    Some(ty) => format!(": {}", pretty_type(&ty.val(), 0)),
-                    None => String::from(""),
-                }
-            );
+        ast::Declaration::Function(fun_arg, args, expr) => {
+            let id_str = pretty_arg(fun_arg, 0);
             let args_str = args
                 .iter()
                 .map(|Spanned(a, _)| pretty_arg(a, 0))
@@ -93,11 +86,12 @@ pub fn pretty_expr(expr: &ast::Expression, ind: usize) -> String {
             if stmts.is_empty() {
                 String::new()
             } else {
-                "\n".to_owned() + &stmts
-                    .iter()
-                    .map(|stmt| pretty_stmt(stmt, ind + 1))
-                    .collect::<Vec<String>>()
-                    .join("\n")
+                "\n".to_owned()
+                    + &stmts
+                        .iter()
+                        .map(|stmt| pretty_stmt(stmt, ind + 1))
+                        .collect::<Vec<String>>()
+                        .join("\n")
             },
             match expr {
                 Some(e) => format!(

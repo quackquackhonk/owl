@@ -54,9 +54,8 @@ pub fn owl_repl_parser(lex: &mut InputIter) -> ParseResult<ReplStatement> {
             } else {
                 Ok(ReplStatement::Expr(e))
             }
-
         }
-        None => Err(Unrecoverable::EndOfInput)
+        None => Err(Unrecoverable::EndOfInput),
     }
 }
 
@@ -164,12 +163,13 @@ fn parse_declaration(
                 args
             };
 
-            let ret_typ = match lex.peek() {
+            let sp = id.span();
+            let fun_arg = match lex.peek() {
                 Some(Spanned(Token::Arrow, _)) => {
                     let _ = expect_tok(Token::Arrow, lex, errors)?;
-                    Some(parse_type(lex, errors)?)
+                    Spanned::new(Arg(id, Some(parse_type(lex, errors)?)), sp)
                 }
-                _ => None,
+                _ => Spanned::new(Arg(id, None), sp),
             };
 
             let body = match lex.peek() {
@@ -193,7 +193,7 @@ fn parse_declaration(
 
             let sp = start + body.span();
             Ok(Some(Spanned(
-                Declaration::Function(id, args, ret_typ, body),
+                Declaration::Function(fun_arg, args, body),
                 sp,
             )))
         }
@@ -343,7 +343,7 @@ fn parse_expr(
         // Bool ops have the same precedence
         Some(Spanned(Token::And, _)) => parse_op_rhs(at, BinOp::And, lex, errors),
         Some(Spanned(Token::Or, _)) => parse_op_rhs(at, BinOp::Or, lex, errors),
-        Some(_) | None => Ok(at)
+        Some(_) | None => Ok(at),
     }
 }
 
