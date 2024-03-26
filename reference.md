@@ -1,7 +1,7 @@
-# Owl Language Reference
+# Syntax
 
 ## Comments
-    
+
 Comments are any line starting with `#`, or a pair of `#*` ... `*#`
 
 ## Arguments
@@ -37,8 +37,8 @@ Statements are either declarations, or expressions that end with a semicolon
 ## Expressions
 
     <atom> ::= () | true | false
-        | <ident> 
-        | <number> 
+        | <ident>
+        | <number>
         | (<expr>)
         | { <block> }
         | <atom>(<exprlist>)
@@ -46,7 +46,11 @@ Statements are either declarations, or expressions that end with a semicolon
     <expr> ::= <atom>
         | <atom> <op> <expr>
 
-    <exprlist> ::= <expr> 
+    <exprlist> ::= <expr>
         | <expr>, <exprlist>
 
     <block> ::= <stmt>* <expr>?
+
+# Semantics
+
+# Tooling
