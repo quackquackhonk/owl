@@ -1,20 +1,18 @@
+use std::fs::File;
+
 use crate::syntax::ast;
 
-use super::Emmiter;
+use super::OwlBackend;
 
 #[derive(Debug)]
-struct WasmEmmiter {
+struct WasmBackend {
     ast: ast::Program,
 }
 
-impl WasmEmmiter {
+// TODO: Magic Header
+
+impl WasmBackend {
     pub fn new(ast: ast::Program) -> Self {
         Self { ast }
-    }
-}
-
-impl Emmiter for WasmEmmiter {
-    fn codegen(path: &str) -> anyhow::Result<()> {
-        todo!()
     }
 }
