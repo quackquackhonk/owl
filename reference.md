@@ -9,20 +9,17 @@ Comments are any line starting with `#`, or a pair of `#*` ... `*#`
 Arguments are identifier with optional type information
 
     arg ::= <ident>
-        |   <ident>: <type>
-
-    arglist ::= <arg>
-        |   <arg>, <arglist>
+        |   <ident>::<type>
 
 ## Declarations
 
 There are value and function declarations
 
-    <return> ::= -> <type>
+    return ::= -> <type>
 
     decl ::= let <arg> = <expr>;
-        | fun <ident>(<arglist>) <return>? = <expr>;
-        | fun <ident>(<arglist>) <return>? { <block> }
+        | fun <ident> <arg>* <return>? = <expr>;
+        | fun <ident> <arg>* <return>? { <block> }
 
 Statements are either declarations, or expressions that end with a semicolon
 
@@ -30,26 +27,26 @@ Statements are either declarations, or expressions that end with a semicolon
 
 ## Types
 
-    <type> ::= int | bool | unit
+    type ::= int | bool | unit
         | (<type>)
         | <type> -> <type>
 
 ## Expressions
 
-    <atom> ::= () | true | false
+    atom ::= () | true | false
         | <ident>
         | <number>
         | (<expr>)
         | { <block> }
         | <atom>(<exprlist>)
 
-    <expr> ::= <atom>
+    expr ::= <atom>
         | <atom> <op> <expr>
 
-    <exprlist> ::= <expr>
+    exprlist ::= <expr>
         | <expr>, <exprlist>
 
-    <block> ::= <stmt>* <expr>?
+    block ::= <stmt>* <expr>?
 
 # Semantics
 

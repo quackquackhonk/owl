@@ -1,6 +1,6 @@
 # This is a single line comment
 
-fun sum(a: int, b: int) -> int {
+fun sum a::int b::int -> int {
     a + b
 }
 
@@ -9,5 +9,6 @@ fun sum(a: int, b: int) -> int {
  *#
 
 fun main() -> int {
-    sum(1, 5)
+    # sum 1 (1 + 1)
+    sum 1 $ 1 + 1
 }

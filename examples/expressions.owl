@@ -1,11 +1,9 @@
 fun main() -> bool {
-    fun add1(x: int) -> int {
-        x + 1
+    fun add1 x::int -> int = x + 1;
+
+    fun call_fun f::(int -> int) val::int -> int {
+        f val
     }
 
-    fun call_fun(f: int -> int, val: int) -> int {
-        f(val)
-    }
-
-    call_fun(add1, 1) == 2
+    (call_fun add1 1) == 2
 }

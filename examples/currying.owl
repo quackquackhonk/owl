@@ -1,18 +1,18 @@
 # functions in Owl are curried by default
 # the type of the function is:
 #   int -> int -> int -> int -> int
-fun sum4(a, b, c, d) {
+fun sum4 a b c d {
     a + b + c + d
 }
 
 # function application is with parens
-fun main() -> bool {
+fun main -> bool {
     # int -> int -> int -> int
-    let add1_sum3 = sum4(1);
+    let add1_sum3 = sum4 1;
 
     # int -> int
-    let add6 = add1_sum3(2, 3);
+    let add6 = add1_sum3 2 3
 
-    10 == add6(4)
+    10 == (add6 4)
 }
 

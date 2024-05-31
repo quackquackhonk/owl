@@ -1,19 +1,19 @@
-fun prod(a, b) = a * b;
+fun prod a b = a * b;
 
-fun mixed_prod(a, b: int) = a * b;
+fun mixed_prod a b::int = a * b;
 
-fun typed_prod(a: int, b: int) -> int = a * b;
+fun typed_prod a::int b::int -> int = a * b;
 
 
 fun main() {
     # you can declare functions inside functions
 
     # the signature to this function is inferred
-    fun nested(x) {
+    fun nested x {
         x
     }
 
-    let five: int = nested(5);
+    let five::int = nested 5;
 
     # the type of the value is also inferred
     let b = true && false || (5 == 1);
