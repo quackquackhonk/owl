@@ -8,7 +8,7 @@ fun sum a::int b::int -> int {
  * You can # nest comments as well
  *#
 
-fun main() -> int {
+fun main -> int {
     # sum 1 (1 + 1)
     sum 1 $ 1 + 1
 }
