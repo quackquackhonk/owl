@@ -1,11 +1,9 @@
-use std::ops::Range;
-
 use thiserror::Error;
 
 use super::{lexer::Token, span::Span};
 use crate::syntax::span::Spanned;
 
-use ariadne::{Color, Label, Report, ReportKind, Source};
+use ariadne::{Label, Report, ReportKind, Source};
 
 // TODO: I should have some trait that describes `Reportable` types so I can implement the function
 // for report by defining label, message

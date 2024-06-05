@@ -73,13 +73,10 @@ pub fn pretty_expr(expr: &ast::Expression, ind: usize) -> String {
             pretty_expr(&rhs.val(), 0)
         ),
         // ast::Expression::UnaryOp(_, _) => unimplemented!(),
-        ast::Expression::FuncCall(func, args) => format!(
+        ast::Expression::Apply(func, arg) => format!(
             "(call {} {})",
             pretty_expr(&func.val(), 0),
-            args.iter()
-                .map(|Spanned(e, _)| format!("{}", pretty_expr(e, 0)))
-                .collect::<Vec<String>>()
-                .join(" ")
+            pretty_expr(&arg.val(), 0)
         ),
         ast::Expression::Block(stmts, expr) => format!(
             "(block {}{})",

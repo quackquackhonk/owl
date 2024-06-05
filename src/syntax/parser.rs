@@ -7,6 +7,7 @@ use super::{
     span::{Span, Spanned},
 };
 
+/// Type alias for the input iterator for the parser
 type InputIter = Peekable<std::vec::IntoIter<Spanned<Token>>>;
 
 type ParseResult<T> = Result<T, Unrecoverable>;
@@ -19,7 +20,7 @@ pub fn owl_program_parser(path: &str) -> anyhow::Result<Program> {
     let mut source = String::new();
     file.read_to_string(&mut source)?;
 
-    let mut lex = dbg!(lexer(&source)).into_iter().peekable();
+    let mut lex = lexer(&source).into_iter().peekable();
 
     match parse_program(&mut lex) {
         Ok((prog, errs)) if errs.is_empty() => Ok(prog),
@@ -35,6 +36,9 @@ pub fn owl_program_parser(path: &str) -> anyhow::Result<Program> {
     }
 }
 
+/// Entry point for the REPL.
+///
+/// * `lex`: The input iter read from the user.
 pub fn owl_repl_parser(lex: &mut InputIter) -> ParseResult<ReplStatement> {
     let mut errors: Vec<Recoverable> = vec![];
     match lex.peek() {
@@ -108,8 +112,8 @@ fn parse_ident(lex: &mut InputIter, errors: &mut Vec<Recoverable>) -> ParseResul
 fn parse_arg(lex: &mut InputIter, errors: &mut Vec<Recoverable>) -> ParseResult<Spanned<Arg>> {
     let id = parse_ident(lex, errors)?;
     // check for a type
-    if let Some(Spanned(Token::Colon, _)) = lex.peek() {
-        let _ = expect_tok(Token::Colon, lex, errors)?;
+    if let Some(Spanned(Token::DblColon, _)) = lex.peek() {
+        let _ = expect_tok(Token::DblColon, lex, errors)?;
         let ty = parse_type(lex, errors)?;
         let sp = id.span() + ty.span();
         Ok(Spanned::new(Arg(id, Some(ty)), sp))
@@ -119,19 +123,17 @@ fn parse_arg(lex: &mut InputIter, errors: &mut Vec<Recoverable>) -> ParseResult<
     }
 }
 
-fn parse_arg_list(
+fn parse_args(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
 ) -> ParseResult<Vec<Spanned<Arg>>> {
-    let arg = parse_arg(lex, errors)?;
-
-    if let Some(Spanned(Token::Comma, _)) = lex.peek() {
-        let _ = expect_tok(Token::Comma, lex, errors)?;
-        let mut args = parse_arg_list(lex, errors)?;
+    if let Some(Spanned(Token::ID(_), _)) = lex.peek() {
+        let arg = parse_arg(lex, errors)?;
+        let mut args = parse_args(lex, errors)?;
         args.insert(0, arg);
         Ok(args)
     } else {
-        Ok(vec![arg])
+        Ok(vec![])
     }
 }
 
@@ -152,16 +154,7 @@ fn parse_declaration(
             let start = expect_tok(Token::Fun, lex, errors)?;
             let id = parse_ident(lex, errors)?;
 
-            let _ = expect_tok(Token::LParen, lex, errors)?;
-            // check for immediate close
-            let args = if let Some(Spanned(Token::RParen, _)) = lex.peek() {
-                let _ = expect_tok(Token::RParen, lex, errors)?;
-                vec![]
-            } else {
-                let args = parse_arg_list(lex, errors)?;
-                let _ = expect_tok(Token::RParen, lex, errors)?;
-                args
-            };
+            let args = parse_args(lex, errors)?;
 
             let sp = id.span();
             let fun_arg = match lex.peek() {
@@ -305,18 +298,27 @@ fn parse_atom(
         None => Err(Unrecoverable::EndOfInput),
     }?;
 
-    // peek for parens
-    if let Some(Spanned(Token::LParen, _)) = lex.peek() {
-        let _ = expect_tok(Token::LParen, lex, errors)?;
-        let exprs = parse_expr_list(lex, errors)?;
-        let end = expect_tok(Token::RParen, lex, errors)?;
-        let sp = at.span() + end;
-        Ok(Spanned(
-            Expression::FuncCall(Box::new(at), Box::new(exprs)),
-            sp,
-        ))
-    } else {
-        Ok(at)
+    Ok(at)
+}
+
+fn parse_call(
+    lex: &mut InputIter,
+    errors: &mut Vec<Recoverable>,
+) -> ParseResult<Spanned<Expression>> {
+    let at = parse_atom(lex, errors)?;
+
+    match lex.peek() {
+        Some(Spanned(Token::Bool(_), _))
+        | Some(Spanned(Token::Num(_), _))
+        | Some(Spanned(Token::ID(_), _))
+        | Some(Spanned(Token::LBrace, _))
+        | Some(Spanned(Token::LParen, _)) => {
+            let arg = parse_call(lex, errors)?;
+            let sp = at.span() + arg.span();
+            Ok(Spanned(Expression::Apply(Box::new(at), Box::new(arg)), sp))
+        }
+        Some(_) => Ok(at),
+        None => Err(Unrecoverable::EndOfInput),
     }
 }
 
@@ -324,26 +326,18 @@ fn parse_expr(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
 ) -> ParseResult<Spanned<Expression>> {
-    let at = parse_atom(lex, errors)?;
+    let lhs = parse_call(lex, errors)?;
 
     match lex.peek() {
-        // Mult and Div have high precedence
-        Some(Spanned(Token::Mult, _)) => parse_op_rhs(at, BinOp::Mul, lex, errors),
-        Some(Spanned(Token::Divide, _)) => parse_op_rhs(at, BinOp::Div, lex, errors),
-        // Comparison ops have the same precedence
-        Some(Spanned(Token::Eq, _)) => parse_op_rhs(at, BinOp::Neq, lex, errors),
-        Some(Spanned(Token::Neq, _)) => parse_op_rhs(at, BinOp::Eq, lex, errors),
-        Some(Spanned(Token::Lt, _)) => parse_op_rhs(at, BinOp::Lt, lex, errors),
-        Some(Spanned(Token::LtEq, _)) => parse_op_rhs(at, BinOp::LtEq, lex, errors),
-        Some(Spanned(Token::Gt, _)) => parse_op_rhs(at, BinOp::Gt, lex, errors),
-        Some(Spanned(Token::GtEq, _)) => parse_op_rhs(at, BinOp::GtEq, lex, errors),
-        // + and - have lower precedence
-        Some(Spanned(Token::Plus, _)) => parse_op_rhs(at, BinOp::Add, lex, errors),
-        Some(Spanned(Token::Minus, _)) => parse_op_rhs(at, BinOp::Sub, lex, errors),
-        // Bool ops have the same precedence
-        Some(Spanned(Token::And, _)) => parse_op_rhs(at, BinOp::And, lex, errors),
-        Some(Spanned(Token::Or, _)) => parse_op_rhs(at, BinOp::Or, lex, errors),
-        Some(_) | None => Ok(at),
+        // parse binary operations
+        Some(Spanned(tok, sp)) if Token::is_op(tok) => parse_op_rhs(
+            lhs,
+            // This clone is fine since `tok` is guaranteed to be an operator
+            BinOp::try_from(Spanned::new(tok.clone(), *sp))?,
+            lex,
+            errors,
+        ),
+        Some(_) | None => Ok(lhs),
     }
 }
 
@@ -360,20 +354,4 @@ fn parse_op_rhs(
         Expression::BinaryOp(op, Box::new(lhs), Box::new(rhs)),
         sp,
     ))
-}
-
-fn parse_expr_list(
-    lex: &mut InputIter,
-    errors: &mut Vec<Recoverable>,
-) -> ParseResult<Vec<Spanned<Expression>>> {
-    let expr = parse_expr(lex, errors)?;
-
-    if let Some(Spanned(Token::Comma, _)) = lex.peek() {
-        let _ = expect_tok(Token::Comma, lex, errors)?;
-        let mut exprs = parse_expr_list(lex, errors)?;
-        exprs.insert(0, expr);
-        Ok(exprs)
-    } else {
-        Ok(vec![expr])
-    }
 }

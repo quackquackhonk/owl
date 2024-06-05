@@ -1,11 +1,11 @@
 //! This module contains utilities for dealing with the syntax of the Owl language.
 
-pub mod span;
 pub mod ast;
-pub mod pretty;
 pub mod error;
 pub mod lexer;
 pub mod parser;
+pub mod pretty;
+pub mod span;
 
 #[cfg(test)]
 mod tests {

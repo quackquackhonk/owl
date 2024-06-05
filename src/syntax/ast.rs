@@ -2,6 +2,8 @@ use std::fmt::Display;
 
 use crate::syntax::span::Spanned;
 
+use super::{error::Unrecoverable, lexer::Token};
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Program(pub Vec<Spanned<Declaration>>);
 
@@ -42,8 +44,7 @@ pub enum Expression {
     Bool(bool),
     Var(Ident),
     BinaryOp(BinOp, Box<Spanned<Expression>>, Box<Spanned<Expression>>),
-    // UnaryOp(UnOp, Box<Spanned<Expression>>),
-    FuncCall(Box<Spanned<Expression>>, Box<Vec<Spanned<Expression>>>),
+    Apply(Box<Spanned<Expression>>, Box<Spanned<Expression>>),
     Block(Vec<Statement>, Option<Box<Spanned<Expression>>>),
 }
 
@@ -82,6 +83,7 @@ pub enum ReplStatement {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BinOp {
+    App,
     Add,
     Sub,
     Mul,
@@ -96,12 +98,36 @@ pub enum BinOp {
     Or,
 }
 
+impl TryFrom<Spanned<Token>> for BinOp {
+    type Error = Unrecoverable;
+
+    fn try_from(value: Spanned<Token>) -> Result<Self, Self::Error> {
+        match value.0 {
+            Token::App => Ok(BinOp::App),
+            Token::Plus => Ok(BinOp::Add),
+            Token::Minus => Ok(BinOp::Add),
+            Token::Mult => Ok(BinOp::Mul),
+            Token::Divide => Ok(BinOp::Div),
+            Token::Eq => Ok(BinOp::Eq),
+            Token::Neq => Ok(BinOp::Neq),
+            Token::And => Ok(BinOp::And),
+            Token::Or => Ok(BinOp::Or),
+            Token::Lt => Ok(BinOp::Lt),
+            Token::LtEq => Ok(BinOp::LtEq),
+            Token::Gt => Ok(BinOp::Gt),
+            Token::GtEq => Ok(BinOp::GtEq),
+            _ => Err(Unrecoverable::ExpectedKind(String::from("BinOp"), value)),
+        }
+    }
+}
+
 impl Display for BinOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}",
             match self {
+                BinOp::App => String::from("$"),
                 BinOp::Add => String::from("+"),
                 BinOp::Sub => String::from("-"),
                 BinOp::Mul => String::from("*"),

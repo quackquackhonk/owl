@@ -26,8 +26,8 @@ pub enum Token {
     // symbols
     #[token(";")]
     SemiColon,
-    #[token(":")]
-    Colon,
+    #[token("::")]
+    DblColon,
     #[token(",")]
     Comma,
     #[token("->")]
@@ -42,6 +42,8 @@ pub enum Token {
     // #[token("=>")]
     // BigArrow,
     // arith
+    #[token("$")]
+    App,
     #[token("+")]
     Plus,
     #[token("-")]
@@ -79,6 +81,41 @@ pub enum Token {
     Error(String),
 }
 
+impl Token {
+    /// Checks if `tok` is an operator, like `+`, `!=`, or `$`
+    ///
+    /// * `tok`:
+    pub fn is_op(tok: &Token) -> bool {
+        match tok {
+            Token::App
+            | Token::Plus
+            | Token::Minus
+            | Token::Mult
+            | Token::Divide
+            | Token::Bang
+            | Token::Eq
+            | Token::Neq
+            | Token::And
+            | Token::Or
+            | Token::Lt
+            | Token::LtEq
+            | Token::Gt
+            | Token::GtEq => true,
+            _ => false,
+        }
+    }
+
+    /// Checks if the token is a special token.
+    ///
+    /// * `tok`:
+    pub fn is_special(tok: &Token) -> bool {
+        match tok {
+            Token::Comment | Token::MultilineComment | Token::Error(_) | Token::Whitespace => true,
+            _ => false,
+        }
+    }
+}
+
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
@@ -91,11 +128,12 @@ impl Display for Token {
             Token::LBrace => "{".to_string(),
             Token::RBrace => "}".to_string(),
             Token::SemiColon => ";".to_string(),
-            Token::Colon => ":".to_string(),
+            Token::DblColon => ":".to_string(),
             Token::Comma => ",".to_string(),
             Token::Arrow => "->".to_string(),
             Token::LParen => "(".to_string(),
             Token::RParen => ")".to_string(),
+            Token::App => "$".to_string(),
             Token::Plus => "+".to_string(),
             Token::Minus => "-".to_string(),
             Token::Mult => "*".to_string(),
