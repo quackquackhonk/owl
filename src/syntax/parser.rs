@@ -1,3 +1,4 @@
+//! Functions and types to deal parsing a stream of Tokens into the AST
 use std::{fs::File, io::Read, iter::Peekable};
 
 use super::{
@@ -109,6 +110,14 @@ fn parse_ident(lex: &mut InputIter, errors: &mut Vec<Recoverable>) -> ParseResul
     }
 }
 
+/// Attempt to parse an argument in a [`super::ast::Declaration`].
+///
+/// # Grammar
+///
+/// ```
+/// <arg> ::= <ident>
+///     |   <ident>::<type>
+/// ```
 fn parse_arg(lex: &mut InputIter, errors: &mut Vec<Recoverable>) -> ParseResult<Spanned<Arg>> {
     let id = parse_ident(lex, errors)?;
     // check for a type
@@ -123,6 +132,7 @@ fn parse_arg(lex: &mut InputIter, errors: &mut Vec<Recoverable>) -> ParseResult<
     }
 }
 
+/// Attempt to parse 0 or more arguments in a [`super::ast::Declaration`]
 fn parse_args(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
@@ -137,6 +147,17 @@ fn parse_args(
     }
 }
 
+/// Try to parse tokens until an [`super::ast::Declaration`] is parsed.
+///
+/// # Grammar
+///
+/// ```
+/// <return> ::= -> <type>
+///
+/// <decl> ::= let <arg> = <expr>;
+///     | fun <ident> <arg>* <return>? = <expr>;
+///     | fun <ident> <arg>* <return>? { <block> }
+/// ```
 fn parse_declaration(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
@@ -194,6 +215,13 @@ fn parse_declaration(
     }
 }
 
+/// Attempt to parse an [`super::ast::Expression::Block`].
+///
+/// # Grammar
+///
+/// ```
+/// <block> ::= <stmt>* <expr>?
+/// ```
 fn parse_block(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
@@ -244,11 +272,22 @@ fn parse_block(
     Ok(Spanned(Expression::Block(stmts, expr), start + end))
 }
 
+/// Attempt to parse an [`super::ast::Type`].
+///
+/// # Grammar
+///
+/// ```
+/// <type> ::= int | bool | unit
+///     | <ident>
+///     | (<type>)
+///     | <type> -> <type>
+/// ```
 fn parse_type(lex: &mut InputIter, errors: &mut Vec<Recoverable>) -> ParseResult<Spanned<Type>> {
     let lhs = match lex.next() {
         Some(Spanned(Token::ID(x), span)) if x == "int" => Spanned::new(Type::Int, span),
         Some(Spanned(Token::ID(x), span)) if x == "bool" => Spanned::new(Type::Bool, span),
         Some(Spanned(Token::ID(x), span)) if x == "unit" => Spanned::new(Type::Unit, span),
+        Some(Spanned(Token::ID(x), span)) => Spanned::new(Type::Var(x), span),
         Some(Spanned(Token::LParen, _)) => {
             let ty = parse_type(lex, errors)?;
             let _ = expect_tok(Token::RParen, lex, errors)?;
@@ -268,6 +307,17 @@ fn parse_type(lex: &mut InputIter, errors: &mut Vec<Recoverable>) -> ParseResult
     }
 }
 
+/// Attempt to parse a value [`super::ast::Expression`].
+///
+/// # Grammar
+///
+/// ```
+/// <atom> ::= () | true | false
+///     | <ident>
+///     | <number>
+///     | (<expr>)
+///     | { <block> }
+/// ```
 fn parse_atom(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
@@ -301,6 +351,13 @@ fn parse_atom(
     Ok(at)
 }
 
+/// Attempt to parse a [`super::ast::Expression::Apply`].
+///
+/// # Grammar
+/// ```
+/// <call> ::= <atom>
+///     | <atom> <call>
+/// ```
 fn parse_call(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
@@ -322,6 +379,14 @@ fn parse_call(
     }
 }
 
+/// Attempt to parse an [`super::ast::Expression::BinaryOp`].
+///
+/// # Grammar
+///
+/// ```
+/// <expr> ::= <call>
+///     | <call> <op> <expr>
+/// ```
 fn parse_expr(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
