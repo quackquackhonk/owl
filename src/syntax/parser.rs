@@ -374,8 +374,7 @@ fn parse_call(
             let sp = at.span() + arg.span();
             Ok(Spanned(Expression::Apply(Box::new(at), Box::new(arg)), sp))
         }
-        Some(_) => Ok(at),
-        None => Err(Unrecoverable::EndOfInput),
+        Some(_) | None => Ok(at),
     }
 }
 
@@ -384,39 +383,128 @@ fn parse_call(
 /// # Grammar
 ///
 /// ```
-/// <expr> ::= <call>
-///     | <call> <op> <expr>
+/// <term1> ::= <call> <op> <call>
+/// <term> ::= <term1> { (+ | - | && | ||) <term1> }*
+/// <expr> ::= <term> { $ <term> }*
 /// ```
 fn parse_expr(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
 ) -> ParseResult<Spanned<Expression>> {
-    let lhs = parse_call(lex, errors)?;
+    fn parse_term1(
+        lex: &mut InputIter,
+        errors: &mut Vec<Recoverable>,
+    ) -> ParseResult<Spanned<Expression>> {
+        let mut lhs = parse_call(lex, errors)?;
 
-    match lex.peek() {
-        // parse binary operations
-        Some(Spanned(tok, sp)) if Token::is_op(tok) => parse_op_rhs(
-            lhs,
-            // This clone is fine since `tok` is guaranteed to be an operator
-            BinOp::try_from(Spanned::new(tok.clone(), *sp))?,
-            lex,
-            errors,
-        ),
-        Some(_) | None => Ok(lhs),
+        while let Some(Spanned(tok, _)) = lex.peek() {
+            if Token::is_tight_op(tok) {
+                let op = BinOp::try_from(lex.next().expect("Matched above!"))?;
+                let rhs = parse_call(lex, errors)?;
+                let sp = lhs.span() + rhs.span();
+                lhs = Spanned::new(Expression::BinaryOp(op, Box::new(lhs), Box::new(rhs)), sp);
+            } else {
+                break;
+            }
+        }
+
+        Ok(lhs)
     }
+
+    fn parse_term(
+        lex: &mut InputIter,
+        errors: &mut Vec<Recoverable>,
+    ) -> ParseResult<Spanned<Expression>> {
+        let mut lhs = parse_term1(lex, errors)?;
+
+        while let Some(Spanned(tok, _)) = lex.peek() {
+            if matches!(tok, Token::Plus | Token::Minus | Token::And | Token::Or) {
+                let op = BinOp::try_from(lex.next().expect("Matched above!"))?;
+                let rhs = parse_term1(lex, errors)?;
+                let sp = lhs.span() + rhs.span();
+                lhs = Spanned::new(Expression::BinaryOp(op, Box::new(lhs), Box::new(rhs)), sp);
+            } else {
+                break;
+            }
+        }
+
+        Ok(lhs)
+    }
+
+    let mut lhs = parse_term(lex, errors)?;
+
+    while let Some(Spanned(Token::App, _)) = lex.peek() {
+        let _ = lex.next();
+        let rhs = parse_term(lex, errors)?;
+        let sp = lhs.span() + rhs.span();
+        lhs = Spanned::new(Expression::Apply(Box::new(lhs), Box::new(rhs)), sp);
+    }
+
+    Ok(lhs)
 }
 
-fn parse_op_rhs(
-    lhs: Spanned<Expression>,
-    op: BinOp,
-    lex: &mut InputIter,
-    errors: &mut Vec<Recoverable>,
-) -> ParseResult<Spanned<Expression>> {
-    let _ = lex.next();
-    let rhs = parse_expr(lex, errors)?;
-    let sp = lhs.span() + rhs.span();
-    Ok(Spanned(
-        Expression::BinaryOp(op, Box::new(lhs), Box::new(rhs)),
-        sp,
-    ))
+#[cfg(test)]
+mod tests {
+    use crate::syntax::pretty::pretty_expr;
+
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case("1", Expression::Int(1))]
+    #[case("true", Expression::Bool(true))]
+    #[case("false", Expression::Bool(false))]
+    #[case("()", Expression::Unit)]
+    #[case("ident", Expression::Var("ident".to_string()))]
+    #[case(
+        "x y",
+        Expression::Apply(
+            Box::new(Spanned::new(Expression::Var("x".to_string()), Span::new(0, 1))), 
+            Box::new(Spanned::new(Expression::Var("y".to_string()), Span::new(2, 3))))
+    )]
+    // This should parse as (1 * 2) + 3
+    #[case(
+        "1 * 2 + 3",
+        Expression::BinaryOp(
+            BinOp::Add,
+            Box::new(Spanned::new(
+                Expression::BinaryOp(
+                    BinOp::Mul,
+                    Box::new(Spanned::new(Expression::Int(1), Span::new(0, 1))),
+                    Box::new(Spanned::new(Expression::Int(2), Span::new(4, 5)))
+                ),
+                Span::new(0, 5)
+            )),
+            Box::new(Spanned::new(Expression::Int(3), Span::new(8, 9))),
+        )
+    )]
+    #[case(
+        "square $ 3 - 2 + 4",
+        Expression::Apply(
+            Box::new(Spanned::new(
+                Expression::Var("square".to_string()),
+                Span::new(0, 6)
+            )),
+            Box::new(Spanned::new(
+                Expression::BinaryOp(
+                    BinOp::Add,
+                    Box::new(Spanned::new(
+                        Expression::BinaryOp(
+                            BinOp::Sub,
+                            Box::new(Spanned::new(Expression::Int(3), Span::new(9, 10))), 
+                            Box::new(Spanned::new(Expression::Int(2), Span::new(13, 14)))),
+                        Span::new(9, 14))),
+                    Box::new(Spanned::new(Expression::Int(4), Span::new(17, 18)))
+                ), 
+                Span::new(9, 18)
+            ))
+        ))]
+    fn test_parse_expr(#[case] input: &str, #[case] expected: Expression) {
+        let mut lex = lexer(input).into_iter().peekable();
+        let mut errs = vec![];
+        let Spanned(expr, _) = parse_expr(&mut lex, &mut errs).unwrap();
+        println!("{}", pretty_expr(&expr, 0));
+        assert!(errs.is_empty());
+        assert_eq!(expr, expected);
+    }
 }

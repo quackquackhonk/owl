@@ -82,21 +82,13 @@ pub enum Token {
 }
 
 impl Token {
-    /// Checks if `tok` is an operator, like `+`, `!=`, or `$`
-    ///
-    /// * `tok`:
-    pub fn is_op(tok: &Token) -> bool {
+    pub fn is_tight_op(tok: &Token) -> bool {
         match tok {
-            Token::App
-            | Token::Plus
-            | Token::Minus
-            | Token::Mult
+            Token::Mult
             | Token::Divide
             | Token::Bang
             | Token::Eq
             | Token::Neq
-            | Token::And
-            | Token::Or
             | Token::Lt
             | Token::LtEq
             | Token::Gt

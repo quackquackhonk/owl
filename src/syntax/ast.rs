@@ -83,7 +83,6 @@ pub enum ReplStatement {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BinOp {
-    App,
     Add,
     Sub,
     Mul,
@@ -103,9 +102,8 @@ impl TryFrom<Spanned<Token>> for BinOp {
 
     fn try_from(value: Spanned<Token>) -> Result<Self, Self::Error> {
         match value.0 {
-            Token::App => Ok(BinOp::App),
             Token::Plus => Ok(BinOp::Add),
-            Token::Minus => Ok(BinOp::Add),
+            Token::Minus => Ok(BinOp::Sub),
             Token::Mult => Ok(BinOp::Mul),
             Token::Divide => Ok(BinOp::Div),
             Token::Eq => Ok(BinOp::Eq),
@@ -127,7 +125,6 @@ impl Display for BinOp {
             f,
             "{}",
             match self {
-                BinOp::App => String::from("$"),
                 BinOp::Add => String::from("+"),
                 BinOp::Sub => String::from("-"),
                 BinOp::Mul => String::from("*"),
