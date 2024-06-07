@@ -307,6 +307,34 @@ fn parse_type(lex: &mut InputIter, errors: &mut Vec<Recoverable>) -> ParseResult
     }
 }
 
+/// Attempt to parse the inside of a tuple
+///
+/// # Grammar
+/// ```
+/// <inner_tuple> ::= <expr> { , <expr> }
+/// ```
+fn parse_inner_tuple(
+    lex: &mut InputIter,
+    errors: &mut Vec<Recoverable>,
+) -> ParseResult<Spanned<Expression>> {
+    let first = parse_expr(lex, errors)?;
+    let mut sp = first.span();
+    let mut exprs = vec![first];
+
+    while let Some(Spanned(Token::Comma, _)) = lex.peek() {
+        let _ = lex.next();
+        let next = parse_expr(lex, errors)?;
+        sp = sp + next.span();
+        exprs.push(next);
+    }
+
+    if exprs.len() < 2 {
+        Ok(exprs.pop().expect("At least one!"))
+    } else {
+        Ok(Spanned::new(Expression::Tuple(exprs), sp))
+    }
+}
+
 /// Attempt to parse a value [`super::ast::Expression`].
 ///
 /// # Grammar
@@ -315,7 +343,7 @@ fn parse_type(lex: &mut InputIter, errors: &mut Vec<Recoverable>) -> ParseResult
 /// <atom> ::= () | true | false
 ///     | <ident>
 ///     | <number>
-///     | (<expr>)
+///     | (<inner_tuple>)
 ///     | { <block> }
 /// ```
 fn parse_atom(
@@ -331,7 +359,7 @@ fn parse_atom(
                 let en = expect_tok(Token::RParen, lex, errors)?;
                 Ok(Spanned::new(Expression::Unit, st + en))
             } else {
-                let expr = parse_expr(lex, errors)?;
+                let expr = parse_inner_tuple(lex, errors)?;
                 let _ = expect_tok(Token::RParen, lex, errors)?;
                 Ok(expr)
             }
@@ -445,8 +473,6 @@ fn parse_expr(
 
 #[cfg(test)]
 mod tests {
-    use crate::syntax::pretty::pretty_expr;
-
     use super::*;
     use rstest::rstest;
 
@@ -455,56 +481,96 @@ mod tests {
     #[case("true", Expression::Bool(true))]
     #[case("false", Expression::Bool(false))]
     #[case("()", Expression::Unit)]
+    #[case("(123)", Expression::Int(123))]
     #[case("ident", Expression::Var("ident".to_string()))]
-    #[case(
-        "x y",
-        Expression::Apply(
-            Box::new(Spanned::new(Expression::Var("x".to_string()), Span::new(0, 1))), 
-            Box::new(Spanned::new(Expression::Var("y".to_string()), Span::new(2, 3))))
-    )]
-    // This should parse as (1 * 2) + 3
-    #[case(
-        "1 * 2 + 3",
-        Expression::BinaryOp(
-            BinOp::Add,
-            Box::new(Spanned::new(
-                Expression::BinaryOp(
-                    BinOp::Mul,
-                    Box::new(Spanned::new(Expression::Int(1), Span::new(0, 1))),
-                    Box::new(Spanned::new(Expression::Int(2), Span::new(4, 5)))
-                ),
-                Span::new(0, 5)
-            )),
-            Box::new(Spanned::new(Expression::Int(3), Span::new(8, 9))),
-        )
-    )]
-    #[case(
-        "square $ 3 - 2 + 4",
-        Expression::Apply(
-            Box::new(Spanned::new(
-                Expression::Var("square".to_string()),
-                Span::new(0, 6)
-            )),
-            Box::new(Spanned::new(
-                Expression::BinaryOp(
-                    BinOp::Add,
-                    Box::new(Spanned::new(
-                        Expression::BinaryOp(
-                            BinOp::Sub,
-                            Box::new(Spanned::new(Expression::Int(3), Span::new(9, 10))), 
-                            Box::new(Spanned::new(Expression::Int(2), Span::new(13, 14)))),
-                        Span::new(9, 14))),
-                    Box::new(Spanned::new(Expression::Int(4), Span::new(17, 18)))
-                ), 
-                Span::new(9, 18)
-            ))
-        ))]
     fn test_parse_expr(#[case] input: &str, #[case] expected: Expression) {
         let mut lex = lexer(input).into_iter().peekable();
-        let mut errs = vec![];
+        let mut errs = Vec::from([]);
         let Spanned(expr, _) = parse_expr(&mut lex, &mut errs).unwrap();
-        println!("{}", pretty_expr(&expr, 0));
         assert!(errs.is_empty());
         assert_eq!(expr, expected);
+    }
+
+    #[test]
+    fn test_parse_expr_large() {
+        let mut lex = lexer("(1, a, b)").into_iter().peekable();
+        let mut errs = vec![];
+        let Spanned(expr, _) = parse_expr(&mut lex, &mut errs).unwrap();
+        assert!(errs.is_empty());
+        assert_eq!(
+            expr,
+            Expression::Tuple(Vec::from([
+                Spanned::new(Expression::Int(1), Span::new(1, 2)),
+                Spanned::new(Expression::Var(String::from("a")), Span::new(4, 5)),
+                Spanned::new(Expression::Var(String::from("b")), Span::new(7, 8))
+            ]))
+        );
+
+        let mut lex = lexer("x y").into_iter().peekable();
+        let mut errs = vec![];
+        let Spanned(expr, _) = parse_expr(&mut lex, &mut errs).unwrap();
+        assert!(errs.is_empty());
+        assert_eq!(
+            expr,
+            Expression::Apply(
+                Box::new(Spanned::new(
+                    Expression::Var("x".to_string()),
+                    Span::new(0, 1)
+                )),
+                Box::new(Spanned::new(
+                    Expression::Var("y".to_string()),
+                    Span::new(2, 3)
+                ))
+            )
+        );
+
+        let mut lex = lexer("1 * 2 + 3").into_iter().peekable();
+        let mut errs = vec![];
+        let Spanned(expr, _) = parse_expr(&mut lex, &mut errs).unwrap();
+        assert!(errs.is_empty());
+        assert_eq!(
+            expr,
+            Expression::BinaryOp(
+                BinOp::Add,
+                Box::new(Spanned::new(
+                    Expression::BinaryOp(
+                        BinOp::Mul,
+                        Box::new(Spanned::new(Expression::Int(1), Span::new(0, 1))),
+                        Box::new(Spanned::new(Expression::Int(2), Span::new(4, 5)))
+                    ),
+                    Span::new(0, 5)
+                )),
+                Box::new(Spanned::new(Expression::Int(3), Span::new(8, 9))),
+            )
+        );
+
+        let mut lex = lexer("square $ 3 - 2 + 4").into_iter().peekable();
+        let mut errs = vec![];
+        let Spanned(expr, _) = parse_expr(&mut lex, &mut errs).unwrap();
+        assert!(errs.is_empty());
+        assert_eq!(
+            expr,
+            Expression::Apply(
+                Box::new(Spanned::new(
+                    Expression::Var("square".to_string()),
+                    Span::new(0, 6)
+                )),
+                Box::new(Spanned::new(
+                    Expression::BinaryOp(
+                        BinOp::Add,
+                        Box::new(Spanned::new(
+                            Expression::BinaryOp(
+                                BinOp::Sub,
+                                Box::new(Spanned::new(Expression::Int(3), Span::new(9, 10))),
+                                Box::new(Spanned::new(Expression::Int(2), Span::new(13, 14)))
+                            ),
+                            Span::new(9, 14)
+                        )),
+                        Box::new(Spanned::new(Expression::Int(4), Span::new(17, 18)))
+                    ),
+                    Span::new(9, 18)
+                ))
+            )
+        );
     }
 }

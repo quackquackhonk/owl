@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use super::{ast, span::Spanned};
 
 pub fn indent(indent: usize) -> String {
@@ -66,6 +68,9 @@ pub fn pretty_expr(expr: &ast::Expression, ind: usize) -> String {
         ast::Expression::Int(i) => format!("{}", i.to_string()),
         ast::Expression::Bool(b) => format!("{}", b.to_string()),
         ast::Expression::Var(id) => id.to_string(),
+        ast::Expression::Tuple(exprs) => {
+            format!("({})", exprs.iter().map(|e| pretty_expr(e, 0)).join(", "))
+        }
         ast::Expression::BinaryOp(op, lhs, rhs) => format!(
             "({} {} {})",
             op.to_string(),
