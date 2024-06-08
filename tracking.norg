@@ -1,31 +1,41 @@
 @document.meta
 title: tracking
 description:
-authors:
-version: 1.1.1
+authors: Sahana Tankala
 @end
 
 * Resources
 ** Compiling functional languages (Simon Peytas Jones)
     https://www.microsoft.com/en-us/research/wp-content/uploads/1987/01/slpj-book-1987-small.pdf
+** Compiling with Continuations (Andrew W. Appel)
 
 * Core Features
 ** ( ) wasm compilation
 *** ( ) Translation into Lambda calculus IR
 *** ( ) Emitting WASM
 ** ( ) type checking / inference
-** ( ) function expressions
+** (-) function expressions
+   See {/ examples/functions.owl}
+
 ** User features
-*** ( ) Structures
-*** ( ) enums and pattern matching
+*** ( ) records, enums, and pattern matching
+    See {/ examples/custom_types.owl}
 *** ( ) Pipeline operator
+
+* Known Bugs
+** (-) Function application has its precedence reversed
+
+
 * Tooling
 ** ( ) Language Server
 ** ( ) formatter / linter
 ** ( )
+
+
 * Syntax Sugar
 ** ( ) _ in function calls for easy currying
 ** ( ) list comprehensions
+
+
 * Spitballing
 ** ( ) mechanism for compile time execution
-** ( ) Generics?

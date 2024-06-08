@@ -1,0 +1,19 @@
+# Functions are first class
+
+fun plus_one x {
+    x + 1
+}
+
+fun apply f x {
+    f x
+}
+
+fun main {
+    let square = \x => x * x; 
+
+    let three = apply plus_one 2;
+    let nine = apply square three;
+    let zero = apply (\x => x - x) nine;
+
+    square
+}

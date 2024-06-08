@@ -36,11 +36,11 @@ pub enum Token {
     LParen,
     #[token(")")]
     RParen,
-    // TODO: Function expressions
-    // #[token("@")]
-    // At,
-    // #[token("=>")]
-    // BigArrow,
+    // Function Expressions
+    #[token("\\")]
+    Lambda,
+    #[token("=>")]
+    BigArrow,
     // arith
     #[token("$")]
     App,
@@ -125,6 +125,8 @@ impl Display for Token {
             Token::Arrow => "->".to_string(),
             Token::LParen => "(".to_string(),
             Token::RParen => ")".to_string(),
+            Token::Lambda => "\\".to_string(),
+            Token::BigArrow => "=>".to_string(),
             Token::App => "$".to_string(),
             Token::Plus => "+".to_string(),
             Token::Minus => "-".to_string(),

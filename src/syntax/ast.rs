@@ -43,6 +43,7 @@ pub enum Expression {
     Int(isize),
     Bool(bool),
     Var(Ident),
+    Function(Vec<Spanned<Arg>>, Box<Spanned<Expression>>),
     Tuple(Vec<Spanned<Expression>>),
     BinaryOp(BinOp, Box<Spanned<Expression>>, Box<Spanned<Expression>>),
     Apply(Box<Spanned<Expression>>, Box<Spanned<Expression>>),

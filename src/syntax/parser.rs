@@ -343,6 +343,7 @@ fn parse_inner_tuple(
 /// <atom> ::= () | true | false
 ///     | <ident>
 ///     | <number>
+///     | \ <arg>* => <expr>
 ///     | (<inner_tuple>)
 ///     | { <block> }
 /// ```
@@ -354,6 +355,14 @@ fn parse_atom(
         Some(Spanned(Token::Bool(b), span)) => Ok(Spanned::new(Expression::Bool(b), span)),
         Some(Spanned(Token::Num(n), span)) => Ok(Spanned::new(Expression::Int(n), span)),
         Some(Spanned(Token::ID(id), span)) => Ok(Spanned::new(Expression::Var(id), span)),
+        Some(Spanned(Token::Lambda, span)) => {
+            // Function expressions
+            let args = parse_args(lex, errors)?;
+            let _ = expect_tok(Token::BigArrow, lex, errors)?;
+            let body = parse_expr(lex, errors)?;
+            let sp = span + body.span();
+            Ok(Spanned::new(Expression::Function(args, Box::new(body)), sp))
+        }
         Some(Spanned(Token::LParen, st)) => {
             if let Some(Spanned(Token::RParen, _)) = lex.peek() {
                 let en = expect_tok(Token::RParen, lex, errors)?;
@@ -383,26 +392,36 @@ fn parse_atom(
 ///
 /// # Grammar
 /// ```
-/// <call> ::= <atom>
-///     | <atom> <call>
+/// <call> ::= <atom>+
 /// ```
 fn parse_call(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
 ) -> ParseResult<Spanned<Expression>> {
     let at = parse_atom(lex, errors)?;
+    let mut args = vec![];
 
-    match lex.peek() {
+    while matches!(
+        lex.peek(),
         Some(Spanned(Token::Bool(_), _))
-        | Some(Spanned(Token::Num(_), _))
-        | Some(Spanned(Token::ID(_), _))
-        | Some(Spanned(Token::LBrace, _))
-        | Some(Spanned(Token::LParen, _)) => {
-            let arg = parse_call(lex, errors)?;
-            let sp = at.span() + arg.span();
-            Ok(Spanned(Expression::Apply(Box::new(at), Box::new(arg)), sp))
-        }
-        Some(_) | None => Ok(at),
+            | Some(Spanned(Token::Num(_), _))
+            | Some(Spanned(Token::ID(_), _))
+            | Some(Spanned(Token::Lambda, _))
+            | Some(Spanned(Token::LBrace, _))
+            | Some(Spanned(Token::LParen, _))
+    ) {
+        let next = parse_atom(lex, errors)?;
+        args.push(next);
+    }
+
+    if args.is_empty() {
+        return Ok(at);
+    } else {
+        let exp = args.into_iter().fold(at, |f, a| {
+            let sp = f.span() + a.span();
+            Spanned::new(Expression::Apply(Box::new(f), Box::new(a)), sp)
+        });
+        Ok(exp)
     }
 }
 
@@ -541,6 +560,33 @@ mod tests {
                     Span::new(0, 5)
                 )),
                 Box::new(Spanned::new(Expression::Int(3), Span::new(8, 9))),
+            )
+        );
+
+        let mut lex = lexer("f g x").into_iter().peekable();
+        let mut errs = vec![];
+        let Spanned(expr, _) = parse_expr(&mut lex, &mut errs).unwrap();
+        assert!(errs.is_empty());
+        assert_eq!(
+            expr,
+            Expression::Apply(
+                Box::new(Spanned::new(
+                    Expression::Apply(
+                        Box::new(Spanned::new(
+                            Expression::Var("f".to_string()),
+                            Span::new(0, 1)
+                        )),
+                        Box::new(Spanned::new(
+                            Expression::Var("g".to_string()),
+                            Span::new(2, 3)
+                        ))
+                    ),
+                    Span::new(0, 3)
+                )),
+                Box::new(Spanned::new(
+                    Expression::Var("x".to_string()),
+                    Span::new(4, 5)
+                ))
             )
         );
 

@@ -54,7 +54,7 @@ pub fn pretty_decl(decl: &ast::Declaration, ind: usize) -> String {
                 .iter()
                 .map(|Spanned(a, _)| pretty_arg(a, 0))
                 .collect::<Vec<String>>()
-                .join(", ");
+                .join(" ");
             let args_str = format!("{}[{}]", indent(ind + 1), args_str);
             let expr_str = pretty_expr(&expr.val(), ind + 1);
             format!("(function {}\n{}\n{})", id_str, args_str, expr_str)
@@ -68,6 +68,11 @@ pub fn pretty_expr(expr: &ast::Expression, ind: usize) -> String {
         ast::Expression::Int(i) => format!("{}", i.to_string()),
         ast::Expression::Bool(b) => format!("{}", b.to_string()),
         ast::Expression::Var(id) => id.to_string(),
+        ast::Expression::Function(args, body) => format!(
+            "(lambda ({}) {})",
+            args.iter().map(|Spanned(a, _)| pretty_arg(a, 0)).join(" "),
+            pretty_expr(body, 0)
+        ),
         ast::Expression::Tuple(exprs) => {
             format!("({})", exprs.iter().map(|e| pretty_expr(e, 0)).join(", "))
         }
@@ -115,7 +120,7 @@ pub fn pretty_arg(arg: &ast::Arg, ind: usize) -> String {
         indent(ind),
         arg.0.val(),
         match &arg.1 {
-            Some(ty) => format!(": {}", pretty_type(&ty.val(), 0)),
+            Some(ty) => format!("::{}", pretty_type(&ty.val(), 0)),
             None => String::from(""),
         }
     )
