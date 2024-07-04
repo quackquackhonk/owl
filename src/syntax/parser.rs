@@ -2,7 +2,10 @@
 use std::{fs::File, io::Read, iter::Peekable};
 
 use super::{
-    ast::{Arg, BinOp, Declaration, Expression, Ident, Program, ReplStatement, Statement, Type},
+    ast::{
+        Arg, BinOp, Declaration, Expression, Ident, Program, ReplStatement, Statement, Type,
+        Variant,
+    },
     error::{Recoverable, Unrecoverable},
     lexer::{lexer, Token},
     span::{Span, Spanned},
@@ -96,6 +99,8 @@ fn expect_tok(tok: Token, lex: &mut InputIter, errors: &mut Vec<Recoverable>) ->
     }
 }
 
+/// Attempts to parse a single identifier. This function does not parse fields or subscripting
+/// operations.
 fn parse_ident(lex: &mut InputIter, errors: &mut Vec<Recoverable>) -> ParseResult<Spanned<Ident>> {
     match lex.next() {
         Some(Spanned(Token::ID(name), span)) => Ok(Spanned::new(name, span)),
@@ -147,6 +152,107 @@ fn parse_args(
     }
 }
 
+/// Attempt to parse a single [`super::ast::Variant`]
+///
+/// # Grammar
+/// ```
+/// <variant> ::= <ident>
+///     | <ident>(<tuple_type_body> )
+///     | <ident>{ <record_type_body> }
+/// ```
+fn parse_variant(
+    lex: &mut InputIter,
+    errors: &mut Vec<Recoverable>,
+) -> ParseResult<Spanned<Variant>> {
+    todo!()
+}
+
+/// TODO: Document this function
+///
+/// * `lex`:
+/// * `errors`:
+/// * `sep`:
+/// * `parser`:
+fn parse_sep_list<T: Clone>(
+    lex: &mut InputIter,
+    errors: &mut Vec<Recoverable>,
+    sep: Token,
+    parser: &mut dyn FnMut(&mut InputIter, &mut Vec<Recoverable>) -> ParseResult<Spanned<T>>,
+) -> ParseResult<Vec<Spanned<T>>> {
+    let first = parser(lex, errors)?;
+    let mut sp = first.span();
+    let mut list = vec![first];
+
+    while let Some(Spanned(tok, _)) = lex.peek() {
+        if *tok == sep {
+            let _ = lex.next();
+            let next = parser(lex, errors)?;
+            sp = sp + next.span();
+            list.push(next);
+        } else {
+            break;
+        }
+    }
+
+    Ok(list)
+}
+
+/// Attempt to parse an [`super::ast::Declaration::Record`] or an
+/// [`super::ast::Declaration::Enum`].
+///
+/// # Grammar
+/// ```
+/// <typedec> ::= type <ident>{ <record_type_body> }
+///     | type <ident>(<tuple_type_body>);
+///     | type <ident>;
+///     | enum <ident> { <variants> }
+/// ```
+fn parse_type_declaration(
+    kind: Spanned<Token>,
+    lex: &mut InputIter,
+    errors: &mut Vec<Recoverable>,
+) -> ParseResult<Spanned<Declaration>> {
+    let start = kind.span();
+    match kind.0 {
+        Token::Type => {
+            let name = parse_ident(lex, errors)?;
+            match lex.peek() {
+                Some(Spanned(Token::LParen, _)) => {
+                    let var_start = expect_tok(Token::LParen, lex, errors)?;
+                    let types = parse_sep_list(lex, errors, Token::Comma, &mut parse_type)?;
+                    let end = expect_tok(Token::RParen, lex, errors)?;
+                    let variant = Spanned::new(Variant::Tuple(types), var_start + end);
+                    Ok(Spanned::new(
+                        Declaration::Struct(name, variant),
+                        start + end,
+                    ))
+                }
+                Some(Spanned(Token::LBrace, _)) => {
+                    let var_start = expect_tok(Token::LParen, lex, errors)?;
+                    let types = parse_sep_list(lex, errors, Token::Comma, &mut parse_arg)?;
+                    let end = expect_tok(Token::RParen, lex, errors)?;
+                    let variant = Spanned::new(Variant::Record(types), var_start + end);
+                    Ok(Spanned::new(
+                        Declaration::Struct(name, variant),
+                        start + end,
+                    ))
+                }
+                Some(Spanned(Token::SemiColon, _)) => {
+                    let end = expect_tok(Token::SemiColon, lex, errors)?;
+                    let name_sp = name.span();
+                    Ok(Spanned::new(
+                        Declaration::Struct(name, Spanned::new(Variant::Unit, name_sp)),
+                        start + end,
+                    ))
+                }
+                Some(_) | None => todo!(),
+            }
+        }
+        Token::Enum => todo!(),
+        _ => unreachable!(),
+    }
+}
+
 /// Try to parse tokens until an [`super::ast::Declaration`] is parsed.
 ///
 /// # Grammar
@@ -157,6 +263,7 @@ fn parse_args(
 /// <decl> ::= let <arg> = <expr>;
 ///     | fun <ident> <arg>* <return>? = <expr>;
 ///     | fun <ident> <arg>* <return>? { <block> }
+///     | <typedec>
 /// ```
 fn parse_declaration(
     lex: &mut InputIter,
@@ -210,6 +317,11 @@ fn parse_declaration(
                 Declaration::Function(fun_arg, args, body),
                 sp,
             )))
+        }
+        Some(Spanned(Token::Type, _)) | Some(Spanned(Token::Enum, _)) => {
+            let kind = lex.next().expect("We know this will be `Some`");
+            let type_dec = parse_type_declaration(kind, lex, errors)?;
+            Ok(Some(type_dec))
         }
         Some(_) | None => Ok(None),
     }
@@ -317,21 +429,20 @@ fn parse_inner_tuple(
     lex: &mut InputIter,
     errors: &mut Vec<Recoverable>,
 ) -> ParseResult<Spanned<Expression>> {
-    let first = parse_expr(lex, errors)?;
-    let mut sp = first.span();
-    let mut exprs = vec![first];
-
-    while let Some(Spanned(Token::Comma, _)) = lex.peek() {
-        let _ = lex.next();
-        let next = parse_expr(lex, errors)?;
-        sp = sp + next.span();
-        exprs.push(next);
-    }
+    let mut exprs = parse_sep_list(lex, errors, Token::Comma, &mut parse_expr)?;
+    let st = exprs
+        .first()
+        .expect("parse_sep_list always returns at least one item.")
+        .span();
+    let en = exprs
+        .last()
+        .expect("parse_sep_list always returns at least one item.")
+        .span();
 
     if exprs.len() < 2 {
         Ok(exprs.pop().expect("At least one!"))
     } else {
-        Ok(Spanned::new(Expression::Tuple(exprs), sp))
+        Ok(Spanned::new(Expression::Tuple(exprs), st + en))
     }
 }
 
@@ -495,6 +606,12 @@ mod tests {
     use super::*;
     use rstest::rstest;
 
+    macro_rules! box_expr {
+        ($ex:expr, $st:expr, $end:expr) => {
+            Box::new(Spanned::new($ex, Span::new($st, $end)))
+        };
+    }
+
     #[rstest]
     #[case("1", Expression::Int(1))]
     #[case("true", Expression::Bool(true))]
@@ -532,14 +649,8 @@ mod tests {
         assert_eq!(
             expr,
             Expression::Apply(
-                Box::new(Spanned::new(
-                    Expression::Var("x".to_string()),
-                    Span::new(0, 1)
-                )),
-                Box::new(Spanned::new(
-                    Expression::Var("y".to_string()),
-                    Span::new(2, 3)
-                ))
+                box_expr!(Expression::Var("x".to_string()), 0, 1),
+                box_expr!(Expression::Var("y".to_string()), 2, 3),
             )
         );
 
@@ -551,15 +662,16 @@ mod tests {
             expr,
             Expression::BinaryOp(
                 BinOp::Add,
-                Box::new(Spanned::new(
+                box_expr!(
                     Expression::BinaryOp(
                         BinOp::Mul,
-                        Box::new(Spanned::new(Expression::Int(1), Span::new(0, 1))),
-                        Box::new(Spanned::new(Expression::Int(2), Span::new(4, 5)))
+                        box_expr!(Expression::Int(1), 0, 1),
+                        box_expr!(Expression::Int(2), 4, 5)
                     ),
-                    Span::new(0, 5)
-                )),
-                Box::new(Spanned::new(Expression::Int(3), Span::new(8, 9))),
+                    0,
+                    5
+                ),
+                box_expr!(Expression::Int(3), 8, 9)
             )
         );
 
@@ -570,23 +682,15 @@ mod tests {
         assert_eq!(
             expr,
             Expression::Apply(
-                Box::new(Spanned::new(
+                box_expr!(
                     Expression::Apply(
-                        Box::new(Spanned::new(
-                            Expression::Var("f".to_string()),
-                            Span::new(0, 1)
-                        )),
-                        Box::new(Spanned::new(
-                            Expression::Var("g".to_string()),
-                            Span::new(2, 3)
-                        ))
+                        box_expr!(Expression::Var("f".to_string()), 0, 1),
+                        box_expr!(Expression::Var("g".to_string()), 2, 3)
                     ),
-                    Span::new(0, 3)
-                )),
-                Box::new(Spanned::new(
-                    Expression::Var("x".to_string()),
-                    Span::new(4, 5)
-                ))
+                    0,
+                    3
+                ),
+                box_expr!(Expression::Var("x".to_string()), 4, 5)
             )
         );
 
@@ -597,25 +701,24 @@ mod tests {
         assert_eq!(
             expr,
             Expression::Apply(
-                Box::new(Spanned::new(
-                    Expression::Var("square".to_string()),
-                    Span::new(0, 6)
-                )),
-                Box::new(Spanned::new(
+                box_expr!(Expression::Var("square".to_string()), 0, 6),
+                box_expr!(
                     Expression::BinaryOp(
                         BinOp::Add,
-                        Box::new(Spanned::new(
+                        box_expr!(
                             Expression::BinaryOp(
                                 BinOp::Sub,
-                                Box::new(Spanned::new(Expression::Int(3), Span::new(9, 10))),
-                                Box::new(Spanned::new(Expression::Int(2), Span::new(13, 14)))
+                                box_expr!(Expression::Int(3), 9, 10),
+                                box_expr!(Expression::Int(2), 13, 14)
                             ),
-                            Span::new(9, 14)
-                        )),
-                        Box::new(Spanned::new(Expression::Int(4), Span::new(17, 18)))
+                            9,
+                            14
+                        ),
+                        box_expr!(Expression::Int(4), 17, 18)
                     ),
-                    Span::new(9, 18)
-                ))
+                    9,
+                    18
+                )
             )
         );
     }

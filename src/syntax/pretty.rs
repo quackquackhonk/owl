@@ -59,6 +59,8 @@ pub fn pretty_decl(decl: &ast::Declaration, ind: usize) -> String {
             let expr_str = pretty_expr(&expr.val(), ind + 1);
             format!("(function {}\n{}\n{})", id_str, args_str, expr_str)
         }
+        // TODO: Pretty printing for structs and enums
+        _ => unimplemented!(),
     }
 }
 

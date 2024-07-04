@@ -1,0 +1,58 @@
+# You can create structs with the `type` keyword
+type Point{ x::int, y::int };
+
+fun midpoint p::Point q::Point -> Point {
+    let x = p.x + q.x;
+    let y = p.y + q.y;
+    # Point (x / 2) (y / u)
+    Point $ x / 2 $ y / 2
+}
+
+# The `enum` keyword allows for the declartion of sum types
+# Each variant defines a function to construct the variants
+enum BinOp {
+    # Plus::(unit -> BinOp)
+    Plus, 
+    Minus, 
+    Product, 
+    Divide
+}
+
+enum Expression {
+    # You can make tuple variants like so
+    # Value::(int -> Expression)
+    Value(int),
+    # BinaryExp::(BinOp -> Expression -> Expression -> Expression)
+    BinaryExp{ op::BinOp, lhs::Expression, rhs::Expression }
+}
+
+fun eval expr::Expression -> int {
+    match expr {
+        Value(x) -> x,
+        BinaryExp { op, lhs, rhs } -> {
+            let l = eval lhs;
+            let r = eval rhs;
+            match op {
+                Plus -> l + r,
+                Minus -> l - r,
+                Product -> l * r,
+                Divide -> l / r,
+            }
+        }
+    }
+}
+
+fun make_plus_expr l::int r::int -> Expression {
+    # You can use the name of a variant as a function to construct
+    # that variant
+    BinaryOp Plus $ Value l $ Value r
+}
+
+fun make_product_expr l::int r::int -> Expression {
+    # You can also name the arguments using record construction 
+    # syntax. When named, the arguments can be given in any order.
+    BinaryOp { op = Product, lhs = Value l, rhs = Value r}
+}
+
+let five = make_plus_expr 2 3
+let five_squared = make_product_expr 5 5

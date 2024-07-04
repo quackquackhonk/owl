@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 use crate::syntax::span::Spanned;
 
@@ -54,21 +54,15 @@ pub enum Expression {
 pub enum Declaration {
     Value(Spanned<Arg>, Spanned<Expression>),
     Function(Spanned<Arg>, Vec<Spanned<Arg>>, Spanned<Expression>),
+    Struct(Spanned<Ident>, Spanned<Variant>),
+    Enum(Spanned<Ident>, HashMap<Ident, Spanned<Variant>>),
 }
 
-impl Declaration {
-    pub fn typ(&self) -> &Option<Spanned<Type>> {
-        match self {
-            Declaration::Value(a, _) => a.typ(),
-            Declaration::Function(a, _, _) => a.typ(),
-        }
-    }
-    pub fn body(&self) -> &Spanned<Expression> {
-        match self {
-            Declaration::Value(_, e) => e,
-            Declaration::Function(_, _, e) => e,
-        }
-    }
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Variant {
+    Unit,
+    Record(Vec<Spanned<Arg>>),
+    Tuple(Vec<Spanned<Type>>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

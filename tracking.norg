@@ -20,6 +20,9 @@ authors: Sahana Tankala
 ** User features
 *** ( ) records, enums, and pattern matching
     See {/ examples/custom_types.owl}
+**** ( ) type declarations
+**** ( ) record accessing
+**** ( ) pattern matching expressions
 *** ( ) Pipeline operator
 
 * Known Bugs

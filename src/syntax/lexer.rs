@@ -15,6 +15,10 @@ pub enum Token {
     // declarations
     #[token("let")]
     Let,
+    #[token("type")]
+    Type,
+    #[token("enum")]
+    Enum,
     #[token("=")]
     Assign,
     #[token("fun")]
@@ -117,6 +121,8 @@ impl Display for Token {
             Token::Let => "let".to_string(),
             Token::Assign => "=".to_string(),
             Token::Fun => "fun".to_string(),
+            Token::Type => "type".to_string(),
+            Token::Enum => "enum".to_string(),
             Token::LBrace => "{".to_string(),
             Token::RBrace => "}".to_string(),
             Token::SemiColon => ";".to_string(),
